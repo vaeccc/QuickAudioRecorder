@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-2022
@@ -33,6 +37,29 @@ jobs:
 
       - name: Package Windows executable
         run: pyinstaller --noconsole --onefile --name QuickAudioRecorder main.py
+
+      - name: Smoke-test frozen device probe subprocess
+        shell: pwsh
+        run: |
+          @'
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          executable = Path("dist/QuickAudioRecorder.exe").resolve()
+          with tempfile.TemporaryDirectory() as directory:
+              output = Path(directory) / "devices.json"
+              result = subprocess.run(
+                  [str(executable), "--scan-devices", str(output)],
+                  timeout=30, check=False, stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              )
+              assert result.returncode in (0, 1), result.returncode
+              payload = json.loads(output.read_text(encoding="utf-8"))
+              assert isinstance(payload.get("ok"), bool), payload
+              print("Frozen device probe entry point and JSON IPC passed.")
+          '@ | python -
 
       - name: Upload test artifact
         uses: actions/upload-artifact@v4
