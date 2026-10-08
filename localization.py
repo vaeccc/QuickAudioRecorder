@@ -58,6 +58,12 @@ ZH_CN = {
     "Language:": "语言：",
     "Follow system": "跟随系统",
     "Language changes take effect after restarting the app.": "语言更改将在下次启动软件时生效。",
+    "Startup": "开机自启动",
+    "Start when I sign in to Windows": "登录 Windows 时自动启动",
+    "Settings saved, but Windows startup could not be updated: {error}": "设置已保存，但无法更新开机自启动：{error}",
+    "Hotkey error": "快捷键错误",
+    "The hotkey {hotkey} is assigned to multiple actions.": "快捷键 {hotkey} 已分配给多个操作。",
+    "Could not register hotkey {hotkey}: {error}": "无法注册快捷键 {hotkey}：{error}",
 }
 
 # Values stored by older versions were translated display labels.
