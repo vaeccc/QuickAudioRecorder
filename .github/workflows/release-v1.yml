@@ -1,0 +1,78 @@
+name: Publish QuickAudioRecorder v1.0.0
+
+# Runs on the master merge that adds this file; not every subsequent push.
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/release-v1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quick-audio-recorder-v1.0.0-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install app and packaging dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PyQt6 soundcard soundfile numpy lameenc keyboard pyinstaller
+      - name: Compile and run regression tests
+        shell: pwsh
+        run: |
+          python -m compileall -q .
+          python -m unittest discover -s tests -v
+      - name: Build portable Windows x64 executable
+        shell: pwsh
+        run: pyinstaller --noconsole --onefile --name QuickAudioRecorder main.py
+      - name: Verify frozen audio scan worker
+        shell: pwsh
+        run: |
+          @'
+          import json
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          exe = Path('dist/QuickAudioRecorder.exe').resolve()
+          with tempfile.TemporaryDirectory() as folder:
+              result_path = Path(folder) / 'devices.json'
+              run = subprocess.run(
+                  [str(exe), '--scan-devices', str(result_path)],
+                  timeout=30, check=False, stdout=subprocess.DEVNULL,
+                  stderr=subprocess.DEVNULL,
+              )
+              assert run.returncode in (0, 1), run.returncode
+              result = json.loads(result_path.read_text(encoding='utf-8'))
+              assert isinstance(result.get('ok'), bool)
+              print('Frozen device probe IPC passed.')
+          '@ | python -
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: |
+          $sha = (Get-FileHash 'dist/QuickAudioRecorder.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha  QuickAudioRecorder.exe" | Set-Content 'dist/SHA256.txt' -Encoding ascii
+      - name: Publish v1.0.0 (do not overwrite existing tag)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = git ls-remote --tags origin 'refs/tags/v1.0.0'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not check remote version tags.' }
+          if ($tag) { throw 'v1.0.0 tag already exists: refusing to overwrite an existing release.' }
+          gh release create v1.0.0 'dist/QuickAudioRecorder.exe#QuickAudioRecorder.exe' 'dist/SHA256.txt#SHA256.txt' --target $env:GITHUB_SHA --title 'QuickAudioRecorder v1.0.0' --notes-file 'RELEASE_NOTES_v1.0.0.md' --latest
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release creation failed.' }
