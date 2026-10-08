@@ -77,11 +77,14 @@ class SettingsWindowTests(unittest.TestCase):
     def test_browse_uses_qt_non_native_dialog_and_supports_pasted_path(self):
         with tempfile.TemporaryDirectory() as folder:
             window = self.make_window(str(Path(folder) / "settings.json"))
-            with patch.object(QFileDialog, "getExistingDirectory", return_value=folder) as dialog:
+            # Patch the module reference rather than a wrapped Qt class method.
+            with patch("gui.QFileDialog") as dialog:
+                dialog.Option.DontUseNativeDialog = QFileDialog.Option.DontUseNativeDialog
+                dialog.getExistingDirectory.return_value = folder
                 window.browse_folder()
                 self.assertEqual(window.lbl_folder.text(), folder)
                 self.assertEqual(
-                    dialog.call_args.kwargs["options"],
+                    dialog.getExistingDirectory.call_args.kwargs["options"],
                     QFileDialog.Option.DontUseNativeDialog,
                 )
             direct_path = str(Path(folder) / "my audio files")
