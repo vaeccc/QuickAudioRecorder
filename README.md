@@ -1,5 +1,7 @@
 # Quick Audio Recorder
 
+[简体中文说明](README.zh-CN.md)
+
 **Quick Audio Recorder** is a minimalist, yet powerful tool for Windows to quickly record audio from your microphone, system audio (loopback), or both simultaneously.  
 It sits quietly in your system tray and is always ready with a single click or global hotkey.
 
@@ -71,3 +73,7 @@ To create the standalone executable:
 pip install pyinstaller
 pyinstaller --noconsole --onefile --name QuickAudioRecorder main.py
 ```
+
+### Language / 语言
+
+The settings window supports **Follow system**, **简体中文**, and **English**. Save your preference and restart the app to apply it. Existing hotkeys and English tray-click settings are preserved.
