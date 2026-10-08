@@ -7,7 +7,7 @@ import threading
 from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QMainWindow, 
                              QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                              QPushButton, QFileDialog, QMessageBox, QGroupBox, 
-                             QLineEdit, QFormLayout, QCheckBox)
+                             QLineEdit, QFormLayout, QCheckBox, QScrollArea)
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap, QPainter, QBrush, QKeySequence
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QObject, Qt, QUrl, QMimeData, QDir
 import soundcard as sc
@@ -105,7 +105,7 @@ class SettingsWindow(QMainWindow):
         super().__init__(parent)
         self.lang = ui_language(CONFIG_FILE)
         self.setWindowTitle(tr("Settings - Quick Audio Recorder", self.lang))
-        self.setGeometry(100, 100, 500, 720)
+        self.setGeometry(100, 100, 540, 640)
         self._refresh_serial = 0
         self._saved_device_id = None
         self.devices_loaded.connect(self.on_devices_loaded)
@@ -117,7 +117,10 @@ class SettingsWindow(QMainWindow):
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
-        self.setCentralWidget(container)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(container)
+        self.setCentralWidget(scroll)
 
         # Language
         group_language = QGroupBox(tr("Language:", self.lang).rstrip("：:"))
