@@ -51,7 +51,7 @@ class HotkeyManager:
                     if not key:
                         continue
                     if key in seen:
-                        self._report_error("The hotkey {hotkey} is assigned to multiple actions.".format(hotkey=key))
+                        self._report_error("The hotkey {hotkey} is assigned to multiple actions.", {"hotkey": key})
                         continue
                     seen[key] = action
                     try:
@@ -62,9 +62,10 @@ class HotkeyManager:
                         handles.append(handle)
                     except Exception as exc:
                         logging.exception("Failed to register hotkey %s", key)
-                        self._report_error("Could not register hotkey {hotkey}: {error}".format(
-                            hotkey=key, error=exc,
-                        ))
+                        self._report_error("Could not register hotkey {hotkey}: {error}", {
+                            "hotkey": key,
+                            "error": str(exc),
+                        })
             finally:
                 self._pending.task_done()
 
