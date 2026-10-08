@@ -64,6 +64,17 @@ ZH_CN = {
     "Hotkey error": "快捷键错误",
     "The hotkey {hotkey} is assigned to multiple actions.": "快捷键 {hotkey} 已分配给多个操作。",
     "Could not register hotkey {hotkey}: {error}": "无法注册快捷键 {hotkey}：{error}",
+    "Enter or paste an output folder path": "输入或粘贴录音保存文件夹路径",
+    "You can paste a folder path without opening the browser.": "可以直接粘贴路径，无需打开文件夹选择器。",
+    "Scanning audio devices...": "正在扫描音频设备...",
+    "Cancel scan": "取消扫描",
+    "Device scan process could not start.": "无法启动音频设备扫描进程。",
+    "Device scan cancelled.": "已取消扫描音频设备。",
+    "Device scan timed out.": "扫描音频设备超时，已尝试终止扫描进程。",
+    "Device scan process crashed.": "音频设备扫描进程异常退出。",
+    "Device scan failed. Check diagnostic logs.": "扫描失败，请查看诊断日志。",
+    "Found {count} audio devices.": "已找到 {count} 个音频设备。",
+    "Cannot open folder browser. Paste the folder path directly.": "无法打开文件夹选择器，请直接粘贴路径。",
 }
 
 # Values stored by older versions were translated display labels.
