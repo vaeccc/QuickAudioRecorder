@@ -77,3 +77,9 @@ pyinstaller --noconsole --onefile --name QuickAudioRecorder main.py
 ### Language / 语言
 
 The settings window supports **Follow system**, **简体中文**, and **English**. Save your preference and restart the app to apply it. Existing hotkeys and English tray-click settings are preserved.
+
+### Windows startup and configuration
+
+In Settings, enable **Start when I sign in to Windows** and click **Save Settings** to opt in. Disable the option and save to remove the startup entry. No administrator rights are needed. Keep the EXE at a permanent location before enabling startup. The app runs in the system tray.
+
+Configuration is stored at `%APPDATA%\\QuickAudioRecorder\\settings.json` (legacy settings are copied on first launch). Device refresh and global hotkey registration run outside the UI thread, and saving settings no longer displays a blocking success dialog.
