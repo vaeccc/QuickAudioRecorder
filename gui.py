@@ -3,19 +3,22 @@ import os
 import json
 import shutil
 import tempfile
+import threading
 from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QMainWindow, 
                              QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                              QPushButton, QFileDialog, QMessageBox, QGroupBox, 
                              QLineEdit, QFormLayout, QCheckBox)
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap, QPainter, QBrush, QKeySequence
-from PyQt6.QtCore import pyqtSignal, QObject, Qt, QUrl, QMimeData, QDir
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, QObject, Qt, QUrl, QMimeData, QDir
 import soundcard as sc
-import keyboard
+from app_config import settings_path, write_settings
+from hotkeys import HotkeyManager
+from startup import is_startup_enabled, set_startup_enabled
 from audio_recorder import AudioRecorder, get_devices
 from clipboard_utils import copy_file_to_clipboard
 from localization import tr, ui_language, read_settings, normalize_tray_mode
 
-CONFIG_FILE = "settings.json"
+CONFIG_FILE = settings_path()
 
 def resource_path(relative_path):
     try:
@@ -26,6 +29,8 @@ def resource_path(relative_path):
 
 class SignalManager(QObject):
     recording_finished = pyqtSignal(str, str)
+    hotkey_requested = pyqtSignal(str)
+    hotkey_error = pyqtSignal(str)
 
 class HotkeyEdit(QLineEdit):
     """
@@ -94,13 +99,17 @@ class HotkeyEdit(QLineEdit):
 
 class SettingsWindow(QMainWindow):
     settings_saved = pyqtSignal()
+    devices_loaded = pyqtSignal(int, list, object, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.lang = ui_language(CONFIG_FILE)
         self.setWindowTitle(tr("Settings - Quick Audio Recorder", self.lang))
         self.setGeometry(100, 100, 500, 720)
-        
+        self._refresh_serial = 0
+        self._saved_device_id = None
+        self.devices_loaded.connect(self.on_devices_loaded)
+
         self.init_ui()
         self.load_settings()
 
@@ -124,14 +133,24 @@ class SettingsWindow(QMainWindow):
         group_language.setLayout(layout_language)
         layout.addWidget(group_language)
 
+        # Windows logon startup
+        group_startup = QGroupBox(tr("Startup", self.lang))
+        layout_startup = QVBoxLayout()
+        self.chk_autostart = QCheckBox(tr("Start when I sign in to Windows", self.lang))
+        self.chk_autostart.setChecked(is_startup_enabled())
+        self.chk_autostart.setEnabled(os.name == "nt")
+        layout_startup.addWidget(self.chk_autostart)
+        group_startup.setLayout(layout_startup)
+        layout.addWidget(group_startup)
+
         # Microphone
         group_mic = QGroupBox(tr("Input Device", self.lang))
         layout_mic = QVBoxLayout()
         self.combo_mic = QComboBox()
         layout_mic.addWidget(self.combo_mic)
-        btn_refresh = QPushButton(tr("Refresh Devices", self.lang))
-        btn_refresh.clicked.connect(self.refresh_devices)
-        layout_mic.addWidget(btn_refresh)
+        self.btn_refresh = QPushButton(tr("Refresh Devices", self.lang))
+        self.btn_refresh.clicked.connect(self.refresh_devices)
+        layout_mic.addWidget(self.btn_refresh)
         group_mic.setLayout(layout_mic)
         layout.addWidget(group_mic)
 
@@ -199,22 +218,46 @@ class SettingsWindow(QMainWindow):
         btn_save = QPushButton(tr("Save Settings", self.lang))
         btn_save.clicked.connect(self.save_settings)
         layout.addWidget(btn_save)
+        self.lbl_save_status = QLabel("")
+        self.lbl_save_status.setWordWrap(True)
+        layout.addWidget(self.lbl_save_status)
 
         self.refresh_devices()
 
     def refresh_devices(self):
+        """Enumerate audio hardware off the GUI thread to keep settings responsive."""
+        self._refresh_serial += 1
+        serial = self._refresh_serial
+        self.btn_refresh.setEnabled(False)
+
+        def discover():
+            try:
+                mics = get_devices(include_loopback=False)
+                default = sc.default_microphone()
+                default_id = default.id if default else None
+                error = None
+            except Exception as exc:
+                mics, default_id, error = [], None, str(exc)
+            self.devices_loaded.emit(serial, mics, default_id, error)
+
+        threading.Thread(target=discover, name="RecorderDeviceDiscovery", daemon=True).start()
+
+    @pyqtSlot(int, list, object, object)
+    def on_devices_loaded(self, serial, mics, default_id, error):
+        if serial != self._refresh_serial:
+            return
+        self.btn_refresh.setEnabled(True)
+        if error:
+            print(f"Error refreshing devices: {error}")
+            return
+        selected_id = self.combo_mic.currentData() or self._saved_device_id or default_id
         self.combo_mic.clear()
-        try:
-            mics = get_devices(include_loopback=False)
-            default_mic = sc.default_microphone()
-            default_index = 0
-            for i, m in enumerate(mics):
-                self.combo_mic.addItem(f"{m['name']}", m['id'])
-                if m['id'] == default_mic.id:
-                    default_index = i
-            self.combo_mic.setCurrentIndex(default_index)
-        except Exception as e:
-            print(f"Error refreshing devices: {e}")
+        for mic in mics:
+            self.combo_mic.addItem(mic["name"], mic["id"])
+        idx = self.combo_mic.findData(selected_id)
+        if idx >= 0:
+            self.combo_mic.setCurrentIndex(idx)
+        self._saved_device_id = self.combo_mic.currentData()
 
     def browse_folder(self):
         folder = QFileDialog.getExistingDirectory(self, tr("Select Output Folder", self.lang))
@@ -235,6 +278,7 @@ class SettingsWindow(QMainWindow):
                 if fmt_idx >= 0: self.combo_fmt.setCurrentIndex(fmt_idx)
                 
                 saved_id = data.get("device_id")
+                self._saved_device_id = saved_id
                 if saved_id:
                     idx = self.combo_mic.findData(saved_id)
                     if idx >= 0: self.combo_mic.setCurrentIndex(idx)
@@ -258,12 +302,26 @@ class SettingsWindow(QMainWindow):
     def save_settings(self):
         data = self.get_settings()
         try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            QMessageBox.information(self, tr("Settings", self.lang), tr("Settings saved successfully.", self.lang))
-            self.settings_saved.emit()
-        except Exception as e:
-            QMessageBox.critical(self, tr("Error", self.lang), tr("Failed to save settings: {error}", self.lang, error=e))
+            write_settings(CONFIG_FILE, data)
+        except Exception as exc:
+            QMessageBox.critical(
+                self, tr("Error", self.lang),
+                tr("Failed to save settings: {error}", self.lang, error=exc),
+            )
+            return
+
+        try:
+            if self.chk_autostart.isChecked() != is_startup_enabled():
+                set_startup_enabled(self.chk_autostart.isChecked())
+            self.lbl_save_status.setText(tr("Settings saved successfully.", self.lang))
+        except OSError as exc:
+            self.chk_autostart.setChecked(is_startup_enabled())
+            self.lbl_save_status.setText(
+                tr("Settings saved, but Windows startup could not be updated: {error}",
+                   self.lang, error=exc)
+            )
+        # Do not show a modal success dialog or synchronously install Windows hooks.
+        self.settings_saved.emit()
 
     def get_settings(self):
         return {
@@ -291,6 +349,12 @@ class TrayApplication(QObject):
         
         self.signals = SignalManager()
         self.signals.recording_finished.connect(self.on_recording_finished)
+        self.signals.hotkey_requested.connect(self.on_hotkey_requested)
+        self.signals.hotkey_error.connect(self.on_hotkey_error)
+        self.hotkey_manager = HotkeyManager(
+            self.signals.hotkey_requested.emit,
+            self.signals.hotkey_error.emit,
+        )
 
         self.icon_idle_path = resource_path("icon_idle.png")
         self.icon_rec_path = resource_path("icon_rec.png")
@@ -363,19 +427,29 @@ class TrayApplication(QObject):
         self.tray_icon.setContextMenu(self.menu)
 
     def register_hotkeys(self):
-        try: keyboard.unhook_all_hotkeys() # Ensure no old hotkeys are active
-        except: pass
         settings = self.settings_window.get_settings()
-        hk_mic = settings.get("hk_mic")
-        hk_loop = settings.get("hk_loop")
-        hk_both = settings.get("hk_both")
-        hk_stop = settings.get("hk_stop")
-        try:
-            if hk_mic: keyboard.add_hotkey(hk_mic, lambda: self.start_recording("mic"))
-            if hk_loop: keyboard.add_hotkey(hk_loop, lambda: self.start_recording("loopback"))
-            if hk_both: keyboard.add_hotkey(hk_both, lambda: self.start_recording("both"))
-            if hk_stop: keyboard.add_hotkey(hk_stop, self.stop_recording)
-        except Exception as e: print(f"Failed to register hotkeys: {e}")
+        self.hotkey_manager.update({
+            "mic": settings.get("hk_mic"),
+            "loopback": settings.get("hk_loop"),
+            "both": settings.get("hk_both"),
+            "stop": settings.get("hk_stop"),
+        })
+
+    @pyqtSlot(str)
+    def on_hotkey_requested(self, action):
+        # The keyboard library invokes callbacks on its worker threads.
+        # Queued Qt signals move the actual recording/UI operation to the GUI thread.
+        if action == "stop":
+            self.stop_recording()
+        elif action in ("mic", "loopback", "both"):
+            self.start_recording(action)
+
+    @pyqtSlot(str)
+    def on_hotkey_error(self, message):
+        self.tray_icon.showMessage(
+            tr("Hotkey error", self.lang), tr(message, self.lang),
+            QSystemTrayIcon.MessageIcon.Warning, 4000,
+        )
 
     def on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
@@ -470,5 +544,6 @@ class TrayApplication(QObject):
         self.tray_icon.showMessage(tr("Finished", self.lang), msg, QSystemTrayIcon.MessageIcon.Information, 2000)
 
     def exit_app(self):
+        self.hotkey_manager.close()
         if self.recorder: self.recorder.stop()
         self.app.quit()
