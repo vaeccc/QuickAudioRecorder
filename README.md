@@ -83,3 +83,10 @@ The settings window supports **Follow system**, **简体中文**, and **English*
 In Settings, enable **Start when I sign in to Windows** and click **Save Settings** to opt in. Disable the option and save to remove the startup entry. No administrator rights are needed. Keep the EXE at a permanent location before enabling startup. The app runs in the system tray.
 
 Configuration is stored at `%APPDATA%\\QuickAudioRecorder\\settings.json` (legacy settings are copied on first launch). Device refresh and global hotkey registration run outside the UI thread, and saving settings no longer displays a blocking success dialog.
+
+### Troubleshooting Windows device discovery and folder picker hangs
+
+- The output folder can be typed or pasted directly, without opening any dialog. **Browse** uses Qt's non-native directory picker.
+- Refreshing microphones uses a separate subprocess instead of calling WASAPI in the GUI process. The user can cancel a scan; scans time out after 15 seconds and preserve the previous device list on failure.
+- Diagnostics are written to `%LOCALAPPDATA%\QuickAudioRecorder\Logs\`: `app.log` contains operation milestones and `hang-stacks.log` attempts to record Python stacks when the GUI event loop stops responding for 8 seconds.
+- If the problem persists, check these files (remove personal information before sharing). Native driver hangs may require a Windows process dump.
