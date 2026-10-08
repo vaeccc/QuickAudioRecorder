@@ -30,7 +30,7 @@ def resource_path(relative_path):
 class SignalManager(QObject):
     recording_finished = pyqtSignal(str, str)
     hotkey_requested = pyqtSignal(str)
-    hotkey_error = pyqtSignal(str)
+    hotkey_error = pyqtSignal(str, object)
 
 class HotkeyEdit(QLineEdit):
     """
@@ -444,10 +444,10 @@ class TrayApplication(QObject):
         elif action in ("mic", "loopback", "both"):
             self.start_recording(action)
 
-    @pyqtSlot(str)
-    def on_hotkey_error(self, message):
+    @pyqtSlot(str, object)
+    def on_hotkey_error(self, message, parameters):
         self.tray_icon.showMessage(
-            tr("Hotkey error", self.lang), tr(message, self.lang),
+            tr("Hotkey error", self.lang), tr(message, self.lang, **parameters),
             QSystemTrayIcon.MessageIcon.Warning, 4000,
         )
 
