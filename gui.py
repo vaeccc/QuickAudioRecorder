@@ -3,18 +3,19 @@ import os
 import json
 import shutil
 import tempfile
-import threading
+import logging
+import time
 from PyQt6.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QMainWindow, 
                              QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                              QPushButton, QFileDialog, QMessageBox, QGroupBox, 
                              QLineEdit, QFormLayout, QCheckBox, QScrollArea)
 from PyQt6.QtGui import QIcon, QAction, QColor, QPixmap, QPainter, QBrush, QKeySequence
 from PyQt6.QtCore import pyqtSignal, pyqtSlot, QObject, Qt, QUrl, QMimeData, QDir
-import soundcard as sc
+from device_scanner import DeviceScanner
 from app_config import settings_path, write_settings
 from hotkeys import HotkeyManager
 from startup import is_startup_enabled, set_startup_enabled
-from audio_recorder import AudioRecorder, get_devices
+from audio_recorder import AudioRecorder
 from clipboard_utils import copy_file_to_clipboard
 from localization import tr, ui_language, read_settings, normalize_tray_mode
 
@@ -99,16 +100,15 @@ class HotkeyEdit(QLineEdit):
 
 class SettingsWindow(QMainWindow):
     settings_saved = pyqtSignal()
-    devices_loaded = pyqtSignal(int, list, object, object)
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.lang = ui_language(CONFIG_FILE)
         self.setWindowTitle(tr("Settings - Quick Audio Recorder", self.lang))
         self.setGeometry(100, 100, 540, 640)
-        self._refresh_serial = 0
         self._saved_device_id = None
-        self.devices_loaded.connect(self.on_devices_loaded)
+        self.device_scanner = DeviceScanner(self)
+        self.device_scanner.completed.connect(self.on_devices_loaded)
+        self.device_scanner.busy_changed.connect(self.on_scan_busy_changed)
 
         self.init_ui()
         self.load_settings()
@@ -151,6 +151,9 @@ class SettingsWindow(QMainWindow):
         layout_mic = QVBoxLayout()
         self.combo_mic = QComboBox()
         layout_mic.addWidget(self.combo_mic)
+        self.lbl_device_status = QLabel("")
+        self.lbl_device_status.setWordWrap(True)
+        layout_mic.addWidget(self.lbl_device_status)
         self.btn_refresh = QPushButton(tr("Refresh Devices", self.lang))
         self.btn_refresh.clicked.connect(self.refresh_devices)
         layout_mic.addWidget(self.btn_refresh)
@@ -162,7 +165,9 @@ class SettingsWindow(QMainWindow):
         layout_out = QFormLayout()
         
         layout_folder_inner = QHBoxLayout()
-        self.lbl_folder = QLabel(os.getcwd())
+        self.lbl_folder = QLineEdit(os.getcwd())
+        self.lbl_folder.setPlaceholderText(tr("Enter or paste an output folder path", self.lang))
+        self.lbl_folder.setToolTip(tr("You can paste a folder path without opening the browser.", self.lang))
         btn_browse = QPushButton(tr("Browse...", self.lang))
         btn_browse.clicked.connect(self.browse_folder)
         layout_folder_inner.addWidget(self.lbl_folder)
@@ -228,44 +233,61 @@ class SettingsWindow(QMainWindow):
         self.refresh_devices()
 
     def refresh_devices(self):
-        """Enumerate audio hardware off the GUI thread to keep settings responsive."""
-        self._refresh_serial += 1
-        serial = self._refresh_serial
-        self.btn_refresh.setEnabled(False)
-
-        def discover():
-            try:
-                mics = get_devices(include_loopback=False)
-                default = sc.default_microphone()
-                default_id = default.id if default else None
-                error = None
-            except Exception as exc:
-                mics, default_id, error = [], None, str(exc)
-            self.devices_loaded.emit(serial, mics, default_id, error)
-
-        threading.Thread(target=discover, name="RecorderDeviceDiscovery", daemon=True).start()
-
-    @pyqtSlot(int, list, object, object)
-    def on_devices_loaded(self, serial, mics, default_id, error):
-        if serial != self._refresh_serial:
+        if self.device_scanner.busy:
+            self.device_scanner.cancel()
             return
-        self.btn_refresh.setEnabled(True)
-        if error:
-            print(f"Error refreshing devices: {error}")
+        logging.getLogger(__name__).info("ui.refresh_devices.clicked")
+        self.lbl_device_status.setText(tr("Scanning audio devices...", self.lang))
+        self.device_scanner.start_scan()
+
+    @pyqtSlot(bool)
+    def on_scan_busy_changed(self, busy):
+        self.btn_refresh.setText(
+            tr("Cancel scan", self.lang) if busy else tr("Refresh Devices", self.lang)
+        )
+
+    @pyqtSlot(bool, list, object, str)
+    def on_devices_loaded(self, success, mics, default_id, error):
+        if not success:
+            logging.getLogger(__name__).warning("ui.refresh_devices.failed")
+            self.lbl_device_status.setText(tr(error, self.lang))
             return
+
         selected_id = self.combo_mic.currentData() or self._saved_device_id or default_id
         self.combo_mic.clear()
         for mic in mics:
             self.combo_mic.addItem(mic["name"], mic["id"])
         idx = self.combo_mic.findData(selected_id)
+        if idx < 0 and self.combo_mic.count():
+            idx = self.combo_mic.findData(default_id)
         if idx >= 0:
             self.combo_mic.setCurrentIndex(idx)
         self._saved_device_id = self.combo_mic.currentData()
+        self.lbl_device_status.setText(
+            tr("Found {count} audio devices.", self.lang, count=len(mics))
+        )
 
     def browse_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, tr("Select Output Folder", self.lang))
-        if folder:
-            self.lbl_folder.setText(folder)
+        started = time.monotonic()
+        logging.getLogger(__name__).info("ui.browse_folder.clicked")
+        try:
+            folder = QFileDialog.getExistingDirectory(
+                self,
+                tr("Select Output Folder", self.lang),
+                self.lbl_folder.text() or os.path.expanduser("~"),
+                options=QFileDialog.Option.DontUseNativeDialog,
+            )
+            if folder:
+                self.lbl_folder.setText(folder)
+            logging.getLogger(__name__).info(
+                "ui.browse_folder.finished elapsed_s=%.2f selected=%s",
+                time.monotonic() - started, bool(folder),
+            )
+        except Exception:
+            logging.getLogger(__name__).exception("ui.browse_folder.failed")
+            self.lbl_save_status.setText(
+                tr("Cannot open folder browser. Paste the folder path directly.", self.lang)
+            )
 
     def load_settings(self):
         if os.path.exists(CONFIG_FILE):
