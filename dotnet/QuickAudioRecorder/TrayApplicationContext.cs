@@ -39,7 +39,7 @@ namespace QuickAudioRecorder
             {
                 if (e.Button == MouseButtons.Left) await ToggleAsync();
             };
-            _timer.Tick += (_, __) => RefreshTray();
+            _timer.Tick += (_, __) => UpdateTrayAppearance();
             _hotkeys.Triggered += async id =>
             {
                 if (id == 4) await StopAsync();
@@ -135,16 +135,19 @@ namespace QuickAudioRecorder
             finally { _busy = false; RefreshTray(); }
         }
 
-        private void RefreshTray()
+        private void UpdateTrayAppearance()
         {
             bool recording = _recorder.IsRecording;
             _tray.Icon = recording ? _recordingIcon : _idleIcon;
-            _tray.Text = (recording
-                ? T("录音中 ", "Recording ") + _clock.Elapsed.ToString(@"hh\:mm\:ss")
-                : _busy ? T("正在处理录音", "Processing recording") :
-                "QuickAudioRecorder") .Substring(0, Math.Min(60,
-                    recording ? (T("录音中 ", "Recording ") + _clock.Elapsed.ToString(@"hh\:mm\:ss")).Length :
-                    _busy ? T("正在处理录音", "Processing recording").Length : "QuickAudioRecorder".Length));
+            string text = recording ? T("录音中 ", "Recording ") + _clock.Elapsed.ToString(@"hh\:mm\:ss")
+                : _busy ? T("正在处理录音", "Processing recording") : "QuickAudioRecorder";
+            _tray.Text = text.Length > 60 ? text.Substring(0, 60) : text;
+        }
+
+        private void RefreshTray()
+        {
+            bool recording = _recorder.IsRecording;
+            UpdateTrayAppearance();
             _menu.Items.Clear();
             if (recording || _busy)
             {
