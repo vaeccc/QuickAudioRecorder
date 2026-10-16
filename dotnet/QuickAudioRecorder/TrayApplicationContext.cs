@@ -147,7 +147,7 @@ namespace QuickAudioRecorder
             bool recording = _recorder.IsRecording;
             _tray.Icon = recording ? _recordingIcon : _idleIcon;
             string text = recording ? T("录音中 ", "Recording ") + _clock.Elapsed.ToString(@"hh\:mm\:ss")
-                : _busy ? T("正在处理录音", "Processing recording") : "QuickAudioRecorder";
+                : _busy ? T("正在处理录音", "Processing recording") : "MiniRec";
             _tray.Text = text.Length > 60 ? text.Substring(0, 60) : text;
         }
 
