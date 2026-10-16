@@ -30,7 +30,9 @@ namespace QuickAudioRecorder
         {
             var requested = new List<Binding>();
             var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var owners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var values = new[] { settings.HotkeyMic, settings.HotkeySystem, settings.HotkeyBoth, settings.HotkeyStop };
+            var names = new[] { "录制麦克风", "录制电脑声音", "混合录音", "停止并保存" };
             for (int i = 0; i < values.Length; i++)
             {
                 if (string.IsNullOrWhiteSpace(values[i])) continue;
@@ -43,9 +45,10 @@ namespace QuickAudioRecorder
                 string key = binding.Modifiers + ":" + binding.Key;
                 if (!unique.Add(key))
                 {
-                    error = "快捷键重复: " + values[i];
+                    error = "快捷键重复：" + names[i] + " 与 " + owners[key] + " 都使用 " + values[i];
                     return false;
                 }
+                owners[key] = names[i];
                 requested.Add(binding);
             }
 
@@ -55,7 +58,7 @@ namespace QuickAudioRecorder
             {
                 if (!RegisterHotKey(Handle, binding.Id, binding.Modifiers | ModNoRepeat, binding.Key))
                 {
-                    error = "快捷键被其他程序占用: " + values[binding.Id - 1];
+                    error = "快捷键被其他程序占用：" + names[binding.Id - 1] + "（" + values[binding.Id - 1] + "）";
                     UnregisterAll();
                     foreach (var previous in old)
                     {
@@ -69,6 +72,8 @@ namespace QuickAudioRecorder
             error = null;
             return true;
         }
+
+        public void Suspend() { UnregisterAll(); }
 
         private static bool TryParse(string value, int id, out Binding binding)
         {

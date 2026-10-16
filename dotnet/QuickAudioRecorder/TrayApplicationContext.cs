@@ -30,7 +30,6 @@ namespace QuickAudioRecorder
         {
             Diagnostics.Write("Tray initialization: loading settings.");
             _settings = SettingsStore.Load();
-            _settings.Validate();
             _english = _settings.Language == "en_US" ||
                 (_settings.Language == "system" &&
                  !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
@@ -193,7 +192,14 @@ namespace QuickAudioRecorder
                 _settingsForm.Activate();
                 return;
             }
-            var form = new SettingsForm(_settings.Clone());
+            _hotkeys.Suspend();
+            SettingsForm form;
+            try { form = new SettingsForm(_settings.Clone()); }
+            catch
+            {
+                _hotkeys.TryUpdate(_settings, out _);
+                throw;
+            }
             form.SaveRequested = (next, autoStart) =>
             {
                 if (!_hotkeys.TryUpdate(next, out string hotkeyError)) return hotkeyError;
@@ -213,7 +219,11 @@ namespace QuickAudioRecorder
                 }
             };
             _settingsForm = form;
-            form.FormClosed += (_, __) => { if (_settingsForm == form) _settingsForm = null; };
+            form.FormClosed += (_, __) =>
+            {
+                if (_settingsForm == form) _settingsForm = null;
+                if (!_hotkeys.TryUpdate(_settings, out string error)) Diagnostics.Write("Hotkey restore after settings: " + error);
+            };
             form.Show();
         }
 
