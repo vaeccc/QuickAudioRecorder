@@ -34,7 +34,7 @@ namespace QuickAudioRecorder
                 catch (Exception ex)
                 {
                     Diagnostics.Write("Fatal startup/hosting exception: " + ex);
-                    try { MessageBox.Show("QuickAudioRecorder 启动失败。\n\n" + ex.Message, "QuickAudioRecorder", MessageBoxButtons.OK, MessageBoxIcon.Error); } catch { }
+                    try { MessageBox.Show("MiniRec 启动失败。\n\n" + ex.Message, "MiniRec", MessageBoxButtons.OK, MessageBoxIcon.Error); } catch { }
                     Environment.ExitCode = 1;
                 }
             }
