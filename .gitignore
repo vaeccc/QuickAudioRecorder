@@ -24,3 +24,10 @@ settings.json
 # IDE
 .vscode/
 .idea/
+
+# .NET Framework rewrite
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
