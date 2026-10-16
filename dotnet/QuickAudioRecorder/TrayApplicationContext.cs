@@ -204,17 +204,38 @@ namespace QuickAudioRecorder
             {
                 if (!_hotkeys.TryUpdate(next, out string hotkeyError)) return hotkeyError;
                 var previous = _settings;
+                bool previousStartup;
                 try
                 {
+                    previousStartup = Startup.Enabled;
+                }
+                catch (Exception ex)
+                {
+                    _hotkeys.TryUpdate(previous, out _);
+                    return ex.Message;
+                }
+                try
+                {
+                    // Update the registry first: if JSON saving fails, restore it.
+                    // The in-memory settings are not committed until both succeed.
+                    if (previousStartup != autoStart) Startup.Set(autoStart);
                     SettingsStore.Save(next);
-                    Startup.Set(autoStart);
                     _settings = next;
                     RefreshTray();
                     return null;
                 }
                 catch (Exception ex)
                 {
-                    _hotkeys.TryUpdate(previous, out _);
+                    try
+                    {
+                        if (Startup.Enabled != previousStartup) Startup.Set(previousStartup);
+                    }
+                    catch (Exception rollbackEx)
+                    {
+                        Diagnostics.Write("Startup setting rollback: " + rollbackEx);
+                    }
+                    if (!_hotkeys.TryUpdate(previous, out string restoreError))
+                        Diagnostics.Write("Hotkey rollback: " + restoreError);
                     return ex.Message;
                 }
             };
