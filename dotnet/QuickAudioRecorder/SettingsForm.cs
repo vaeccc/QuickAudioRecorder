@@ -44,9 +44,9 @@ namespace QuickAudioRecorder
             // Use the native icon embedded in MiniRec.exe, matching File Explorer.
             try
             {
-                using (var executableIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+                using (var executableIcon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath))
                     if (executableIcon != null)
-                        Icon = (Icon)executableIcon.Clone();
+                        Icon = (System.Drawing.Icon)executableIcon.Clone();
             }
             catch (Exception ex)
             {
