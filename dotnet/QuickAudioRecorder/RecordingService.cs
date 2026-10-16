@@ -293,11 +293,21 @@ namespace QuickAudioRecorder
             }
             public static CaptureTrack OpenMicrophone(string deviceId)
             {
-                var e = new MMDeviceEnumerator();
-                var device = string.IsNullOrEmpty(deviceId)
-                    ? e.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia)
-                    : e.GetDevice(deviceId);
-                return new CaptureTrack(new WasapiCapture(device));
+                using (var e = new MMDeviceEnumerator())
+                {
+                    MMDevice device = null;
+                    if (!string.IsNullOrEmpty(deviceId))
+                    {
+                        try { device = e.GetDevice(deviceId); }
+                        catch (Exception ex)
+                        {
+                            Diagnostics.Write("Saved microphone no longer available; using system default: " + ex.Message);
+                        }
+                    }
+                    if (device == null || device.State != DeviceState.Active)
+                        device = e.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia);
+                    return new CaptureTrack(new WasapiCapture(device));
+                }
             }
             public static CaptureTrack OpenLoopback() =>
                 new CaptureTrack(new WasapiLoopbackCapture());
