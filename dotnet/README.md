@@ -1,6 +1,6 @@
-# QuickAudioRecorder — Windows 原生托盘版（预览）
+# MiniRec — Windows 原生托盘版（预览）
 
-这是 QuickAudioRecorder 的 **.NET Framework 4.8 + WinForms + NAudio 2.4.0** 重写原型。
+MiniRec 是从 QuickAudioRecorder 重写的 **.NET Framework 4.8 + WinForms + NAudio 2.4.0** 重写原型。
 原 Python / PyQt6 版本保留在仓库根目录及 `master` 分支，互不覆盖。
 
 ## 设计目标
@@ -8,7 +8,7 @@
 - 不显示主窗口，启动后直接常驻系统托盘
 - 左键点击托盘：使用上次录音模式快速开始或停止
 - 右键：录制麦克风、电脑声音、混合录音、打开文件夹、设置、退出
-- 系统原生快捷键 `RegisterHotKey`；冲突时拒绝保存有问题的绑定
+- 系统原生快捷键 `RegisterHotKey`；兼容旧版配置里的数字小键盘 `+`、`-` 单键（分别对应 `VK_ADD`、`VK_SUBTRACT`），也支持 Ctrl/Alt/Shift 组合；冲突时拒绝保存有问题的绑定
 - 通过 NAudio WASAPI 捕获麦克风与系统播放音频
 - WAV / MP3；可选音量标准化；可选复制文件到剪贴板
 - 不额外安装 .NET 10 Desktop Runtime；使用 Windows 自带的 .NET Framework 4.8/4.8.1
@@ -18,7 +18,7 @@
 
 **未经过 Windows 实机编译、录音和性能验收，禁止视为正式版。**
 本分支提供首个技术验证原型，GitHub Actions 自动执行 Windows 构建并生成预览 ZIP。
-打开 GitHub Actions 的对应构建运行，在 Artifacts 中领取 ZIP；不是 Releases 正式包。
+打开 GitHub Actions 的对应构建运行，在 Artifacts 中领取 `MiniRec-net48-preview-win-x64`；不是 Releases 正式安装包。
 
 ## 本地编译
 
@@ -28,9 +28,9 @@
 msbuild dotnet/QuickAudioRecorder/QuickAudioRecorder.csproj /restore /p:Configuration=Release /p:Platform=x64
 ```
 
-发布的是 **EXE + NAudio DLL** 的便携目录，不是单独一个 EXE。复制完整文件夹即可运行，避免为嵌入 DLL 引入额外加载器。首次运行默认录音目录为“文档\\QuickAudioRecorder”。
+发布的是 **MiniRec.exe + NAudio DLL** 的便携目录，不是单独一个 EXE。复制完整文件夹即可运行，避免为嵌入 DLL 引入额外加载器。首次运行默认录音目录为“文档\\QuickAudioRecorder”。
 
-## 迁移旧配置
+**兼容说明**：为保证旧版快捷键（尤其是数字小键盘 `+` 和 `-`）、录音目录及其他偏好不丢失，现阶段仍使用 `%APPDATA%\QuickAudioRecorder\settings.json`、原有日志目录以及原有单实例标识。内部代码命名空间和 GitHub 仓库名称暂不改动。系统托盘的空闲/录制状态继续使用旧版灰色/红色圆形图标；设置窗口和任务栏使用 MiniRec.exe 内嵌的同一灰色圆形图标。更换 EXE 文件名前应先退出旧版，并根据需要重新保存开机启动设置。\n\n## 迁移旧配置
 
 尝试读取当前用户的 `%APPDATA%\\QuickAudioRecorder\\settings.json`，维持与 Python 版本相同的主要字段；升级前请备份该文件。
 预览版首次运行会直接读取旧设置；保存会写回同一个文件。因此强烈建议**先关闭旧 Python 进程，备份 JSON，再测试新版本**。

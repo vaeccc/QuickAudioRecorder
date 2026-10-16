@@ -39,16 +39,16 @@ namespace QuickAudioRecorder
             _original = settings.Clone();
             _english = settings.Language == "en_US" ||
                 (settings.Language == "system" && !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
-            Text = T("QuickAudioRecorder 设置", "QuickAudioRecorder Settings");
+            Text = T("MiniRec 设置", "MiniRec Settings");
+            Icon = IconResources.LoadIdle();
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             ShowInTaskbar = true;
             AutoScaleMode = AutoScaleMode.Font;
             Font = new Font("Microsoft YaHei UI", 9f);
-            Icon = IconResources.LoadIdle();
-            ClientSize = new Size(560, 475);
-            MinimumSize = new Size(500, 420);
+            ClientSize = new Size(560, 420);
+            MinimumSize = new Size(520, 430);
             _errors.BlinkStyle = ErrorBlinkStyle.NeverBlink;
             BuildUi();
             LoadValues(settings);
@@ -76,56 +76,203 @@ namespace QuickAudioRecorder
 
         private TabPage BuildAudioTab()
         {
-            var page = new TabPage(T("录音设置", "Recording")) { Padding = new Padding(14) };
-            var table = Table(4);
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 102));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-            AddField(table, 0, T("麦克风设备", "Microphone"), _mic);
-            _refresh.Text = T("刷新", "Refresh"); _refresh.Margin = new Padding(8, 0, 0, 0); _refresh.Click += async (_, __) => await RefreshDevicesAsync();
-            table.Controls.Add(_refresh, 2, 0);
-            _deviceStatus.Text = T("准备检查设备", "Ready to check devices"); _deviceStatus.ForeColor = SystemColors.GrayText; _deviceStatus.Margin = new Padding(8, 5, 0, 0); table.Controls.Add(_deviceStatus, 3, 0);
+            var page = new TabPage(T("录音设置", "Recording")) { Padding = new Padding(12) };
+            var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3,
+                Margin = Padding.Empty, Padding = Padding.Empty
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 102));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            AddField(layout, 0, T("麦克风设备", "Microphone"), _mic);
+            _refresh.Text = T("刷新", "Refresh");
+            _refresh.AutoSize = true;
+            _refresh.Margin = new Padding(8, 2, 0, 2);
+            _refresh.Click += async (_, __) => await RefreshDevicesAsync();
+            layout.Controls.Add(_refresh, 2, 0);
             _tips.SetToolTip(_mic, T("可从下拉列表选择录音设备", "Select an available recording device"));
-            AddField(table, 1, T("保存位置", "Save location"), _folder);
-            var browse = new Button { Text = T("浏览…", "Browse…"), AutoSize = true, Margin = new Padding(8, 0, 0, 0) }; browse.Click += BrowseForFolder; table.Controls.Add(browse, 2, 1);
+
+            // Device scan status gets its own row instead of shrinking the combobox.
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            _deviceStatus.Text = T("准备检查设备", "Ready to check devices");
+            _deviceStatus.ForeColor = SystemColors.GrayText;
+            _deviceStatus.AutoSize = true;
+            _deviceStatus.Margin = new Padding(0, 0, 0, 9);
+            layout.Controls.Add(_deviceStatus, 1, 1);
+            layout.SetColumnSpan(_deviceStatus, 2);
+
+            AddField(layout, 2, T("保存位置", "Save location"), _folder);
+            var browse = new Button
+            {
+                Text = T("浏览…", "Browse…"), AutoSize = true,
+                Margin = new Padding(8, 2, 0, 2)
+            };
+            browse.Click += BrowseForFolder;
+            layout.Controls.Add(browse, 2, 2);
             _folder.TextChanged += (_, __) => _tips.SetToolTip(_folder, _folder.Text);
-            AddField(table, 2, T("录音格式", "Format"), FormatPanel());
-            AddField(table, 3, T("托盘左键", "Tray left click"), _left);
-            _left.Items.AddRange(new object[] { T("使用上次录音模式", "Last used mode"), T("录制麦克风", "Record microphone"), T("录制电脑声音", "Record system audio"), T("混合录音", "Record both") });
-            var options = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 3, Margin = new Padding(102, 14, 0, 0) };
-            options.Controls.Add(_normalize, 0, 0); options.Controls.Add(_clipboard, 0, 1); options.Controls.Add(_deleteAfter, 0, 2);
+
+            AddField(layout, 3, T("录音格式", "Format"), FormatPanel());
+            AddField(layout, 4, T("托盘左键", "Tray left click"), _left);
+            _left.Items.AddRange(new object[]
+            {
+                T("使用上次录音模式", "Last used mode"),
+                T("录制麦克风", "Record microphone"),
+                T("录制电脑声音", "Record system audio"),
+                T("混合录音", "Record both")
+            });
+
+            var options = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1,
+                Margin = new Padding(102, 10, 0, 0),
+                Padding = Padding.Empty
+            };
             _normalize.Text = T("录音后标准化音量", "Normalize volume after recording");
             _clipboard.Text = T("录音后复制文件到剪贴板", "Copy file to clipboard after recording");
             _deleteAfter.Text = T("复制前将文件移至临时目录", "Move file to temporary folder before copying");
+            _normalize.Margin = new Padding(0, 5, 0, 5);
+            _clipboard.Margin = new Padding(0, 5, 0, 5);
+            _deleteAfter.Margin = new Padding(20, 5, 0, 5);
             _clipboard.CheckedChanged += (_, __) => _deleteAfter.Enabled = _clipboard.Checked;
-            var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true }; content.Controls.Add(options); content.Controls.Add(table); page.Controls.Add(content);
+            options.Controls.Add(_normalize, 0, 0);
+            options.Controls.Add(_clipboard, 0, 1);
+            options.Controls.Add(_deleteAfter, 0, 2);
+
+            // Docking top fills the available width while AutoSize determines height.
+            content.Controls.Add(options);
+            content.Controls.Add(layout);
+            page.Controls.Add(content);
             return page;
         }
 
         private TabPage BuildHotkeyGeneralTab()
         {
-            var page = new TabPage(T("快捷键与常规", "Hotkeys & General")) { Padding = new Padding(14) };
-            var table = Table(2); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58)); table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
-            var hotkeyGroup = new GroupBox { Text = T("全局快捷键", "Global hotkeys"), Dock = DockStyle.Fill, Padding = new Padding(12, 20, 12, 10), AutoSize = true };
-            var hotkeys = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, RowCount = 5 };
-            hotkeys.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); hotkeys.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132));
-            string[] labels = _english ? new[] { "Record microphone", "Record system audio", "Record both", "Stop and save" } : new[] { "录制麦克风", "录制电脑声音", "混合录音", "停止并保存" };
+            var page = new TabPage(T("快捷键与常规", "Hotkeys & General"))
+            {
+                Padding = new Padding(12)
+            };
+            var content = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+            var sections = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1,
+                Margin = Padding.Empty, Padding = Padding.Empty
+            };
+            sections.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+            var hotkeyGroup = new GroupBox
+            {
+                Text = T("全局快捷键", "Global hotkeys"),
+                Dock = DockStyle.Fill, AutoSize = true,
+                Margin = new Padding(0, 2, 0, 10),
+                Padding = new Padding(12, 18, 12, 8)
+            };
+            var hotkeyLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2,
+                Margin = Padding.Empty, Padding = Padding.Empty
+            };
+            hotkeyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            hotkeyLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+
+            string[] labels = _english
+                ? new[] { "Record microphone", "Record system audio", "Record both", "Stop and save" }
+                : new[] { "录制麦克风", "录制电脑声音", "混合录音", "停止并保存" };
+
             for (int i = 0; i < labels.Length; i++)
             {
-                _hotkeys[i] = new KeyGestureTextBox { Dock = DockStyle.Fill, Margin = new Padding(8, 2, 0, 2) };
-                hotkeys.Controls.Add(new Label { Text = labels[i], AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 5, 0, 5) }, 0, i);
-                hotkeys.Controls.Add(_hotkeys[i], 1, i);
+                // Each shortcut has a full-width input with its label above, not
+                // a narrow label squeezed next to an even narrower textbox.
+                var entry = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1,
+                    Margin = new Padding(i % 2 == 0 ? 0 : 8, 0,
+                        i % 2 == 0 ? 8 : 0, 7),
+                    Padding = Padding.Empty
+                };
+                entry.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                var label = new Label
+                {
+                    Text = labels[i], AutoSize = true, Dock = DockStyle.Top,
+                    Margin = new Padding(0, 0, 0, 3)
+                };
+                _hotkeys[i] = new KeyGestureTextBox
+                {
+                    Dock = DockStyle.Top,
+                    Margin = Padding.Empty
+                };
+                entry.Controls.Add(label, 0, 0);
+                entry.Controls.Add(_hotkeys[i], 0, 1);
+                hotkeyLayout.Controls.Add(entry, i % 2, i / 2);
             }
-            var hint = new Label { Text = T("点击后按组合键；Esc 保留原值，Delete 清除。留空表示禁用。", "Click and press a combination; Esc keeps the old value, Delete clears it. Blank disables it."), AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(0, 8, 0, 0) };
-            hotkeys.Controls.Add(hint, 0, 4); hotkeys.SetColumnSpan(hint, 2); hotkeyGroup.Controls.Add(hotkeys);
-            var generalGroup = new GroupBox { Text = T("常规", "General"), Dock = DockStyle.Fill, Padding = new Padding(12, 20, 12, 10), AutoSize = true };
-            var general = Table(2); general.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); general.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
-            var hint2 = new Label { Text = T("托盘左键操作可在“录音设置”中调整。", "Tray left-click behavior is on the Recording tab."), AutoSize = true, ForeColor = SystemColors.GrayText }; general.Controls.Add(hint2, 0, 0); general.SetColumnSpan(hint2, 2);
-            _startup.Text = T("登录 Windows 时自动启动", "Launch when signing in to Windows"); general.Controls.Add(_startup, 0, 1);
-            AddLabeledCombo(general, 2, T("界面语言", "Language"), _language); _language.Items.AddRange(new object[] { T("跟随系统", "Follow system"), "简体中文", "English" });
-            var hint3 = new Label { Text = T("语言切换在重启软件后生效。", "Language changes take effect after restarting."), AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(0, 10, 0, 0) }; general.Controls.Add(hint3, 0, 3); general.SetColumnSpan(hint3, 2);
-            generalGroup.Controls.Add(general); table.Controls.Add(hotkeyGroup, 0, 0); table.Controls.Add(generalGroup, 1, 0); table.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); page.Controls.Add(table);
+
+            var hint = new Label
+            {
+                Text = T("数字小键盘 + / - 可直接录入；也支持组合键。\nEsc 取消，Delete 清除；留空表示禁用。",
+                         "Use numpad + / - directly, or press a key combination.\nEsc cancels, Delete clears; blank disables."),
+                AutoSize = true, Dock = DockStyle.Top,
+                ForeColor = SystemColors.GrayText,
+                Margin = new Padding(0, 5, 0, 0)
+            };
+            hotkeyLayout.Controls.Add(hint, 0, 2);
+            hotkeyLayout.SetColumnSpan(hint, 2);
+            hotkeyGroup.Controls.Add(hotkeyLayout);
+
+            var generalGroup = new GroupBox
+            {
+                Text = T("常规", "General"),
+                Dock = DockStyle.Fill, AutoSize = true,
+                Margin = Padding.Empty,
+                Padding = new Padding(12, 18, 12, 10)
+            };
+            var general = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2,
+                Margin = Padding.Empty, Padding = Padding.Empty
+            };
+            general.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            general.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            _startup.Text = T("登录 Windows 时自动启动", "Launch when signing in to Windows");
+            _startup.Dock = DockStyle.Top;
+            _startup.Margin = new Padding(0, 2, 0, 10);
+            general.Controls.Add(_startup, 0, 0);
+            general.SetColumnSpan(_startup, 2);
+
+            var languageLabel = new Label
+            {
+                Text = T("界面语言", "Language"),
+                AutoSize = true, Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 4, 10, 4)
+            };
+            general.Controls.Add(languageLabel, 0, 1);
+            _language.Dock = DockStyle.Fill;
+            _language.Width = 160;
+            _language.MinimumSize = new Size(150, 0);
+            _language.Margin = new Padding(0, 2, 0, 2);
+            _language.Items.AddRange(new object[]
+            {
+                T("跟随系统", "Follow system"), "简体中文", "English"
+            });
+            general.Controls.Add(_language, 1, 1);
+
+            var languageHint = new Label
+            {
+                Text = T("语言切换将在重启软件后生效。", "Language changes take effect after restarting."),
+                AutoSize = true, Dock = DockStyle.Top,
+                ForeColor = SystemColors.GrayText,
+                Margin = new Padding(0, 8, 0, 0)
+            };
+            general.Controls.Add(languageHint, 0, 2);
+            general.SetColumnSpan(languageHint, 2);
+            generalGroup.Controls.Add(general);
+
+            sections.Controls.Add(hotkeyGroup, 0, 0);
+            sections.Controls.Add(generalGroup, 0, 1);
+            content.Controls.Add(sections);
+            page.Controls.Add(content);
             return page;
         }
 
@@ -134,10 +281,6 @@ namespace QuickAudioRecorder
         {
             table.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
             table.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 8, 0) }, 0, row); control.Margin = new Padding(0, 2, 0, 2); table.Controls.Add(control, 1, row);
-        }
-        private static void AddLabeledCombo(TableLayoutPanel table, int row, string label, Control combo)
-        {
-            table.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); table.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 7, 8, 0) }, 0, row); table.Controls.Add(combo, 1, row);
         }
         private Control FormatPanel()
         {
@@ -158,8 +301,16 @@ namespace QuickAudioRecorder
 
         private async Task RefreshDevicesAsync()
         {
-            if (_loading || _closing) return; _loading = true; _refresh.Enabled = false; _deviceStatus.Text = T("正在检查设备…", "Checking devices…");
-            if (_deviceScan != null && !_deviceScan.IsCompleted) return;
+            if (_loading || _closing) return;
+            if (_deviceScan != null && !_deviceScan.IsCompleted)
+            {
+                _deviceStatus.Text = T("设备仍在检查中，请稍后重试", "Device scan is still running");
+                _refresh.Enabled = false;
+                return;
+            }
+            _loading = true;
+            _refresh.Enabled = false;
+            _deviceStatus.Text = T("正在检查设备…", "Checking devices…");
             string remembered = (_mic.SelectedItem as Device)?.Id ?? _original.DeviceId ?? ""; var previous = _mic.SelectedItem as Device;
             _refreshCancellation?.Cancel(); _refreshCancellation?.Dispose(); _refreshCancellation = new CancellationTokenSource();
             try
@@ -181,7 +332,22 @@ namespace QuickAudioRecorder
                 _loading = false;
                 if (!_closing && !IsDisposed) _refresh.Enabled = _deviceScan == null || _deviceScan.IsCompleted;
                 if (_deviceScan != null && !_deviceScan.IsCompleted)
-                    _deviceScan.ContinueWith(_ => { if (!_closing && !IsDisposed) BeginInvoke((Action)(() => _refresh.Enabled = true)); }, TaskScheduler.Default);
+                    _deviceScan.ContinueWith(task =>
+                    {
+                        // The COM enumeration may outlive a timeout or the window itself.
+                        // Never touch WinForms controls from the worker thread.
+                        try
+                        {
+                            if (task.IsFaulted) Diagnostics.Write("Late device scan: " + task.Exception);
+                            if (_closing || IsDisposed || !IsHandleCreated) return;
+                            BeginInvoke((Action)(() =>
+                            {
+                                if (!_closing && !IsDisposed && _deviceScan == task)
+                                    _refresh.Enabled = true;
+                            }));
+                        }
+                        catch (InvalidOperationException) { } // Includes ObjectDisposedException.
+                    }, TaskScheduler.Default);
             }
         }
         private List<Device> EnumerateDevices()
@@ -199,6 +365,8 @@ namespace QuickAudioRecorder
         private sealed class Device { public string Id; public string Name; public override string ToString() => Name; }
         private sealed class KeyGestureTextBox : TextBox
         {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            private static extern short GetAsyncKeyState(int virtualKey);
             private string _beforeCapture;
             public KeyGestureTextBox() { ReadOnly = true; ShortcutsEnabled = false; }
             protected override void OnEnter(EventArgs e) { _beforeCapture = Text; base.OnEnter(e); }
@@ -207,10 +375,52 @@ namespace QuickAudioRecorder
                 e.Handled = true; e.SuppressKeyPress = true;
                 if (e.KeyCode == Keys.Escape) { Text = _beforeCapture ?? Text; Parent?.Focus(); return; }
                 if (e.KeyCode == Keys.Delete || e.KeyCode == Keys.Back) { Text = ""; return; }
-                if (e.KeyCode == Keys.LWin || e.KeyCode == Keys.RWin || e.Modifiers.HasFlag(Keys.LWin) || e.Modifiers.HasFlag(Keys.RWin)) { System.Media.SystemSounds.Beep.Play(); return; }
-                Keys modifiers = e.Modifiers & Keys.Modifiers; bool validKey = (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z) || (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) || (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) || (e.KeyCode >= Keys.F1 && e.KeyCode <= Keys.F12);
-                if (modifiers == Keys.None || !validKey) { System.Media.SystemSounds.Beep.Play(); return; }
-                var parts = new List<string>(); if ((modifiers & Keys.Control) != 0) parts.Add("Ctrl"); if ((modifiers & Keys.Alt) != 0) parts.Add("Alt"); if ((modifiers & Keys.Shift) != 0) parts.Add("Shift"); string key = e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9 ? ((int)e.KeyCode - (int)Keys.NumPad0).ToString() : e.KeyCode.ToString().Replace("D", ""); parts.Add(key); Text = string.Join("+", parts);
+                // Win is not part of Keys.Modifiers. Check its physical state explicitly.
+                if (e.KeyCode == Keys.LWin || e.KeyCode == Keys.RWin ||
+                    (GetAsyncKeyState(0x5B) & 0x8000) != 0 ||
+                    (GetAsyncKeyState(0x5C) & 0x8000) != 0)
+                {
+                    System.Media.SystemSounds.Beep.Play();
+                    return;
+                }
+                Keys modifiers = e.Modifiers & Keys.Modifiers;
+                // Preserve Python version's single-key numeric keypad + and -.
+                if (e.KeyCode == Keys.Add || e.KeyCode == Keys.Subtract)
+                {
+                    if (modifiers == Keys.None)
+                        Text = e.KeyCode == Keys.Add ? "+" : "-";
+                    else
+                    {
+                        var tokens = new List<string>();
+                        if ((modifiers & Keys.Control) != 0) tokens.Add("Ctrl");
+                        if ((modifiers & Keys.Alt) != 0) tokens.Add("Alt");
+                        if ((modifiers & Keys.Shift) != 0) tokens.Add("Shift");
+                        tokens.Add(e.KeyCode == Keys.Add ? "NumPadAdd" : "NumPadSubtract");
+                        Text = string.Join("+", tokens);
+                    }
+                    return;
+                }
+                bool validKey = (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z) ||
+                    (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) ||
+                    (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) ||
+                    (e.KeyCode >= Keys.F1 && e.KeyCode <= Keys.F12);
+                // Legacy shortcuts also permit single ordinary keys.
+                if (!validKey) { System.Media.SystemSounds.Beep.Play(); return; }
+                var parts = new List<string>();
+                if ((modifiers & Keys.Control) != 0) parts.Add("Ctrl");
+                if ((modifiers & Keys.Alt) != 0) parts.Add("Alt");
+                if ((modifiers & Keys.Shift) != 0) parts.Add("Shift");
+                string key;
+                if (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z)
+                    key = ((char)(int)e.KeyCode).ToString();
+                else if (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9)
+                    key = ((int)e.KeyCode - (int)Keys.D0).ToString();
+                else if (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9)
+                    key = ((int)e.KeyCode - (int)Keys.NumPad0).ToString();
+                else
+                    key = e.KeyCode.ToString();
+                parts.Add(key);
+                Text = string.Join("+", parts);
             }
         }
     }
