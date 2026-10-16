@@ -1,0 +1,41 @@
+name: QuickAudioRecorder .NET Framework 4.8 preview
+
+on:
+  push:
+    branches:
+      - rewrite/dotnet48-tray
+    paths:
+      - "dotnet/**"
+      - ".github/workflows/rewrite-net48.yml"
+  workflow_dispatch:
+
+jobs:
+  build-preview:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore and build
+        shell: pwsh
+        run: |
+          msbuild dotnet/QuickAudioRecorder/QuickAudioRecorder.csproj /restore /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $output = "dotnet/QuickAudioRecorder/bin/x64/Release/net48"
+          if (!(Test-Path "$output/QuickAudioRecorder.exe")) {
+            $output = "dotnet/QuickAudioRecorder/bin/Release/net48"
+          }
+          if (!(Test-Path "$output/QuickAudioRecorder.exe")) { throw "Missing executable" }
+          New-Item -ItemType Directory -Force artifacts/QuickAudioRecorder-preview | Out-Null
+          Get-ChildItem $output -File | Where-Object { $_.Extension -notin @(".pdb", ".xml") } |
+            Copy-Item -Destination artifacts/QuickAudioRecorder-preview
+          Copy-Item dotnet/README.md artifacts/QuickAudioRecorder-preview/README.md
+          Compress-Archive -Path artifacts/QuickAudioRecorder-preview/* -DestinationPath artifacts/QuickAudioRecorder-net48-preview-win-x64.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QuickAudioRecorder-net48-preview-win-x64
+          path: artifacts/QuickAudioRecorder-net48-preview-win-x64.zip
+          if-no-files-found: error
