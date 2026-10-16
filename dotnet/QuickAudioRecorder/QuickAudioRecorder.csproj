@@ -4,7 +4,10 @@
     <OutputType>WinExe</OutputType>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
-    <AssemblyName>QuickAudioRecorder</AssemblyName>
+    <AssemblyName>MiniRec</AssemblyName>
+    <Title>MiniRec</Title>
+    <Product>MiniRec</Product>
+    <Description>Lightweight Windows tray audio recorder</Description>
     <RootNamespace>QuickAudioRecorder</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Version>2.0.0-preview.1</Version>
