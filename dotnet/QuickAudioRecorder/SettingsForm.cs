@@ -202,8 +202,7 @@ namespace QuickAudioRecorder
                                     _refresh.Enabled = true;
                             }));
                         }
-                        catch (InvalidOperationException) { }
-                        catch (ObjectDisposedException) { }
+                        catch (InvalidOperationException) { } // Includes ObjectDisposedException.
                     }, TaskScheduler.Default);
             }
         }
