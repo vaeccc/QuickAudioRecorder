@@ -11,6 +11,12 @@ namespace QuickAudioRecorder
         {
             // Lightweight regression test invoked by CI from the packaged executable.
             if (Array.Exists(Environment.GetCommandLineArgs(), arg =>
+                string.Equals(arg, "--verify-folder-path", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = RecordingFolderLauncher.VerifyFolderPath() ? 0 : 1;
+                return;
+            }
+            if (Array.Exists(Environment.GetCommandLineArgs(), arg =>
                 string.Equals(arg, "--verify-hotkeys", StringComparison.OrdinalIgnoreCase)))
             {
                 Environment.ExitCode = HotkeyService.VerifyLegacyShortcuts() ? 0 : 1;
