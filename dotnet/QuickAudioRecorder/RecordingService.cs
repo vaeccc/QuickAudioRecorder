@@ -51,9 +51,10 @@ namespace QuickAudioRecorder
                 }
                 catch
                 {
+                    foreach (var track in tracks) { try { track.Stop(); } catch { } }
                     foreach (var track in tracks)
                     {
-                        try { track.Stop(); } catch { }
+                        try { track.WaitStopped(); } catch { }
                         track.Dispose();
                         SettingsStore.TryDelete(track.Path);
                     }
@@ -133,6 +134,8 @@ namespace QuickAudioRecorder
                 catch (Exception ex)
                 {
                     Diagnostics.Write("Recording stop: " + ex);
+                    foreach (var track in tracks) { try { track.Stop(); } catch { } }
+                    foreach (var track in tracks) { try { track.WaitStopped(); } catch { } track.Dispose(); }
                     string recovery = PreserveRecovery(tracks, settings.OutputFolder);
                     return new RecordingResult { Error = ex.Message, RecoveryFolder = recovery };
                 }
@@ -276,6 +279,7 @@ namespace QuickAudioRecorder
             private readonly object _writerGate = new object();
             private readonly ManualResetEventSlim _stopped = new ManualResetEventSlim(false);
             private bool _started;
+            private bool _disposed;
             public string Path { get; }
             public long StartTicks { get; private set; }
             public Exception Error { get; private set; }
@@ -317,6 +321,8 @@ namespace QuickAudioRecorder
             }
             public void Dispose()
             {
+                if (_disposed) return;
+                _disposed = true;
                 try { _capture.Dispose(); } catch { }
                 lock (_writerGate) { try { _writer.Dispose(); } catch { } }
                 _stopped.Dispose();
