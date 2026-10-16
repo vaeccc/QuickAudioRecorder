@@ -39,7 +39,7 @@ namespace QuickAudioRecorder
                 Binding binding;
                 if (!TryParse(values[i], i + 1, out binding))
                 {
-                    error = "无效快捷键: " + values[i] + "（例如 Ctrl+Alt+R）";
+                    error = "无效快捷键: " + values[i] + "（例如 Ctrl+Alt+R、数字小键盘 + 或 -）";
                     return false;
                 }
                 string key = binding.Modifiers + ":" + binding.Key;
@@ -78,15 +78,34 @@ namespace QuickAudioRecorder
         private static bool TryParse(string value, int id, out Binding binding)
         {
             binding = null;
-            uint modifiers = 0, key = 0;
-            foreach (string raw in value.Replace(" ", "").Split('+'))
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            // Legacy Python settings store a bare "+" / "-" for the numeric keypad.
+            // Do not split "+" as a modifier delimiter or translate it to Shift+OemPlus.
+            string normalized = value.Trim();
+            if (normalized == "+")
             {
+                binding = new Binding { Id = id, Key = (uint)Keys.Add };
+                return true;
+            }
+            if (normalized == "-")
+            {
+                binding = new Binding { Id = id, Key = (uint)Keys.Subtract };
+                return true;
+            }
+
+            uint modifiers = 0, key = 0;
+            foreach (string raw in normalized.Replace(" ", "").Split('+'))
+            {
+                if (raw.Length == 0) return false;
                 switch (raw.ToLowerInvariant())
                 {
                     case "ctrl": case "control": modifiers |= 0x0002; break;
                     case "alt": modifiers |= 0x0001; break;
                     case "shift": modifiers |= 0x0004; break;
                     case "win": case "windows": modifiers |= 0x0008; break;
+                    case "numpadadd": case "add": key = key == 0 ? (uint)Keys.Add : 0; break;
+                    case "numpadsubtract": case "subtract": case "minus": key = key == 0 ? (uint)Keys.Subtract : 0; break;
                     default:
                         if (key != 0) return false;
                         var part = raw.ToUpperInvariant();
@@ -97,10 +116,29 @@ namespace QuickAudioRecorder
                         else return false;
                         break;
                 }
+                if (key == 0 && (raw.Equals("add", StringComparison.OrdinalIgnoreCase) ||
+                    raw.Equals("numpadadd", StringComparison.OrdinalIgnoreCase) ||
+                    raw.Equals("subtract", StringComparison.OrdinalIgnoreCase) ||
+                    raw.Equals("numpadsubtract", StringComparison.OrdinalIgnoreCase) ||
+                    raw.Equals("minus", StringComparison.OrdinalIgnoreCase)))
+                    return false; // Duplicate physical key.
             }
-            if (key == 0 || modifiers == 0) return false;
+            if (key == 0) return false;
             binding = new Binding { Id = id, Modifiers = modifiers, Key = key };
             return true;
+        }
+
+        // Pure parser regression checks; no global hotkeys are registered.
+        internal static bool VerifyLegacyShortcuts()
+        {
+            Binding b;
+            return TryParse("+", 1, out b) && b.Key == (uint)Keys.Add && b.Modifiers == 0 &&
+                   TryParse("-", 4, out b) && b.Key == (uint)Keys.Subtract && b.Modifiers == 0 &&
+                   TryParse("Ctrl+Alt+D", 1, out b) && b.Key == (uint)Keys.D &&
+                   TryParse("Shift+NumPadAdd", 1, out b) && b.Key == (uint)Keys.Add && b.Modifiers == 0x0004 &&
+                   TryParse("Ctrl+NumPadSubtract", 4, out b) && b.Key == (uint)Keys.Subtract &&
+                   TryParse("F12", 2, out b) && b.Key == (uint)Keys.F12 &&
+                   !TryParse("Ctrl++", 1, out b);
         }
 
         private void UnregisterAll()
