@@ -2,9 +2,7 @@ using System;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -33,8 +31,8 @@ namespace QuickAudioRecorder
             _english = _settings.Language == "en_US" ||
                 (_settings.Language == "system" &&
                  !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
-            _idleIcon = MakeIcon(Color.DimGray);
-            _recordingIcon = MakeIcon(Color.Firebrick);
+            _idleIcon = IconResources.LoadIdle();
+            _recordingIcon = IconResources.LoadRecording();
             _tray = new NotifyIcon { Icon = _idleIcon, Visible = true, ContextMenuStrip = _menu };
             Diagnostics.Write("Tray initialization: NotifyIcon created and visible.");
             _hotkeys = new HotkeyService();
@@ -247,26 +245,5 @@ namespace QuickAudioRecorder
             ExitThread();
         }
 
-        private static Icon MakeIcon(Color color)
-        {
-            using (var bitmap = new Bitmap(32, 32))
-            using (var g = Graphics.FromImage(bitmap))
-            using (var brush = new SolidBrush(color))
-            using (var pen = new Pen(color, 2.5f))
-            {
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.Clear(Color.Transparent);
-                g.FillEllipse(brush, 11, 3, 10, 17);
-                g.DrawArc(pen, 6, 9, 20, 17, 0, 180);
-                g.DrawLine(pen, 16, 26, 16, 30);
-                g.DrawLine(pen, 10, 30, 22, 30);
-                IntPtr handle = bitmap.GetHicon();
-                try { return (Icon)Icon.FromHandle(handle).Clone(); }
-                finally { DestroyIcon(handle); }
-            }
-        }
-
-        [DllImport("user32.dll")]
-        private static extern bool DestroyIcon(IntPtr hIcon);
     }
 }

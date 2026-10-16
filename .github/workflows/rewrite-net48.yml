@@ -42,6 +42,19 @@ jobs:
           Remove-Item $clean -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive $zip -DestinationPath $clean
           $exe = Join-Path $clean "QuickAudioRecorder.exe"
+          $assembly = [Reflection.Assembly]::LoadFrom($exe)
+          $resourceNames = $assembly.GetManifestResourceNames()
+          foreach ($name in @("QuickAudioRecorder.Resources.MiniRec_idle.ico", "QuickAudioRecorder.Resources.MiniRec_recording.ico")) {
+            if ($resourceNames -notcontains $name) { throw "Missing embedded icon resource: $name" }
+            $stream = $assembly.GetManifestResourceStream($name)
+            $icon = $null
+            try { $icon = New-Object -TypeName System.Drawing.Icon -ArgumentList $stream; if (!$icon) { throw "Invalid icon resource: $name" } }
+            finally { if ($icon) { $icon.Dispose() }; if ($stream) { $stream.Dispose() } }
+          }
+          $iconType = $assembly.GetType("QuickAudioRecorder.IconResources")
+          $idle = $iconType.GetMethod("LoadIdle", [Reflection.BindingFlags] 'Static,Public,NonPublic').Invoke($null, $null)
+          if (!$idle) { throw "Idle icon loader returned no icon" }
+          $idle.Dispose()
           $proc = Start-Process $exe -PassThru
           try {
             Start-Sleep -Seconds 5

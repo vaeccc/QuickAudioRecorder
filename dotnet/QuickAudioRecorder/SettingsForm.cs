@@ -46,6 +46,7 @@ namespace QuickAudioRecorder
             ShowInTaskbar = true;
             AutoScaleMode = AutoScaleMode.Font;
             Font = new Font("Microsoft YaHei UI", 9f);
+            Icon = IconResources.LoadIdle();
             ClientSize = new Size(560, 475);
             MinimumSize = new Size(500, 420);
             _errors.BlinkStyle = ErrorBlinkStyle.NeverBlink;
