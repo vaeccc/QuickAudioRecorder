@@ -39,7 +39,19 @@ namespace QuickAudioRecorder
             _original = settings.Clone();
             _english = settings.Language == "en_US" ||
                 (settings.Language == "system" && !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
-            Text = T("QuickAudioRecorder 设置", "QuickAudioRecorder Settings");
+            Text = T("MiniRec 设置", "MiniRec Settings");
+            // WinForms dialogs otherwise show the generic window icon in the taskbar.
+            // Use the native icon embedded in MiniRec.exe, matching File Explorer.
+            try
+            {
+                using (var executableIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
+                    if (executableIcon != null)
+                        Icon = (Icon)executableIcon.Clone();
+            }
+            catch (Exception ex)
+            {
+                Diagnostics.Write("Settings icon: " + ex);
+            }
             StartPosition = FormStartPosition.CenterScreen;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
