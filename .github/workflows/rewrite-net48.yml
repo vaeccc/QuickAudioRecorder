@@ -25,10 +25,10 @@ jobs:
         shell: pwsh
         run: |
           $output = "dotnet/QuickAudioRecorder/bin/x64/Release/net48"
-          if (!(Test-Path "$output/QuickAudioRecorder.exe")) {
+          if (!(Test-Path "$output/MiniRec.exe")) {
             $output = "dotnet/QuickAudioRecorder/bin/Release/net48"
           }
-          if (!(Test-Path "$output/QuickAudioRecorder.exe")) { throw "Missing executable" }
+          if (!(Test-Path "$output/MiniRec.exe")) { throw "Missing executable" }
           New-Item -ItemType Directory -Force artifacts/MiniRec-preview | Out-Null
           Get-ChildItem $output -File | Where-Object { $_.Extension -notin @(".pdb", ".xml") } |
             Copy-Item -Destination artifacts/MiniRec-preview
