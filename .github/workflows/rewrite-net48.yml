@@ -34,6 +34,25 @@ jobs:
             Copy-Item -Destination artifacts/QuickAudioRecorder-preview
           Copy-Item dotnet/README.md artifacts/QuickAudioRecorder-preview/README.md
           Compress-Archive -Path artifacts/QuickAudioRecorder-preview/* -DestinationPath artifacts/QuickAudioRecorder-net48-preview-win-x64.zip -Force
+      - name: Startup smoke test from extracted ZIP
+        shell: pwsh
+        run: |
+          $zip = "artifacts/QuickAudioRecorder-net48-preview-win-x64.zip"
+          $clean = Join-Path $env:RUNNER_TEMP "QuickAudioRecorder-smoke"
+          Remove-Item $clean -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive $zip -DestinationPath $clean
+          $exe = Join-Path $clean "QuickAudioRecorder.exe"
+          $proc = Start-Process $exe -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) { throw "QuickAudioRecorder exited during startup with code $($proc.ExitCode)" }
+            $log = Join-Path $env:LOCALAPPDATA "QuickAudioRecorder\Logs\app.log"
+            if (!(Test-Path $log)) { throw "Startup log was not created: $log" }
+            if ((Get-Content $log -Raw) -notmatch "Tray initialization complete") { throw "Startup completion marker missing from log" }
+            $second = Start-Process $exe -PassThru
+            Start-Sleep -Seconds 2
+            if (!$second.HasExited) { throw "Second instance did not exit" }
+          } finally { if (!$proc.HasExited) { Stop-Process $proc -Force } }
       - uses: actions/upload-artifact@v4
         with:
           name: QuickAudioRecorder-net48-preview-win-x64

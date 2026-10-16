@@ -9,16 +9,29 @@ namespace QuickAudioRecorder
         [STAThread]
         private static void Main()
         {
+            Diagnostics.Write("Process start. Version=" + typeof(Program).Assembly.GetName().Version);
             bool created;
             using (var instance = new Mutex(true, @"Local\QuickAudioRecorder-0D5AD7CA-3F13-4B23-8FA5-F9ED9B4E51D1", out created))
             {
-                if (!created) return; // Only one tray icon and one recorder per user session.
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.ThreadException += (_, e) => Diagnostics.Write("UI exception: " + e.Exception);
-                AppDomain.CurrentDomain.UnhandledException += (_, e) => Diagnostics.Write("Unhandled exception: " + e.ExceptionObject);
-                Application.Run(new TrayApplicationContext());
+                if (!created) { Diagnostics.Write("Another instance is already running; exiting."); return; }
+                try
+                {
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
+                    Application.ThreadException += (_, e) => Diagnostics.Write("UI exception: " + e.Exception);
+                    AppDomain.CurrentDomain.UnhandledException += (_, e) => Diagnostics.Write("Unhandled exception: " + e.ExceptionObject);
+                    Diagnostics.Write("Creating tray application context.");
+                    using (var context = new TrayApplicationContext()) Application.Run(context);
+                    Diagnostics.Write("Message loop exited normally.");
+                }
+                catch (Exception ex)
+                {
+                    Diagnostics.Write("Fatal startup/hosting exception: " + ex);
+                    try { MessageBox.Show("QuickAudioRecorder 启动失败。\n\n" + ex.Message, "QuickAudioRecorder", MessageBoxButtons.OK, MessageBoxIcon.Error); } catch { }
+                    Environment.ExitCode = 1;
+                }
             }
+            Diagnostics.Write("Process exit. Code=" + Environment.ExitCode);
         }
     }
 }

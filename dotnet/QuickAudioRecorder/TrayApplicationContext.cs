@@ -14,7 +14,7 @@ namespace QuickAudioRecorder
     {
         private readonly NotifyIcon _tray;
         private readonly ContextMenuStrip _menu = new ContextMenuStrip();
-        private readonly HotkeyService _hotkeys = new HotkeyService();
+        private readonly HotkeyService _hotkeys;
         private readonly RecordingService _recorder = new RecordingService();
         private readonly Timer _timer = new Timer { Interval = 1000 };
         private readonly Stopwatch _clock = new Stopwatch();
@@ -28,13 +28,18 @@ namespace QuickAudioRecorder
 
         public TrayApplicationContext()
         {
+            Diagnostics.Write("Tray initialization: loading settings.");
             _settings = SettingsStore.Load();
+            _settings.Validate();
             _english = _settings.Language == "en_US" ||
                 (_settings.Language == "system" &&
                  !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
             _idleIcon = MakeIcon(Color.DimGray);
             _recordingIcon = MakeIcon(Color.Firebrick);
             _tray = new NotifyIcon { Icon = _idleIcon, Visible = true, ContextMenuStrip = _menu };
+            Diagnostics.Write("Tray initialization: NotifyIcon created and visible.");
+            _hotkeys = new HotkeyService();
+            Diagnostics.Write("Tray initialization: hotkey service created.");
             _tray.MouseClick += async (_, e) =>
             {
                 if (e.Button == MouseButtons.Left) await ToggleAsync();
@@ -48,6 +53,7 @@ namespace QuickAudioRecorder
             if (!_hotkeys.TryUpdate(_settings, out string error))
                 Diagnostics.Write("Hotkey initialization: " + error);
             RefreshTray();
+            Diagnostics.Write("Tray initialization complete.");
         }
 
         private string T(string zh, string en) => _english ? en : zh;
