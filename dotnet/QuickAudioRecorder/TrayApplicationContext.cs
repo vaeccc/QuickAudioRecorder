@@ -33,8 +33,10 @@ namespace QuickAudioRecorder
             _english = _settings.Language == "en_US" ||
                 (_settings.Language == "system" &&
                  !System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh"));
-            _idleIcon = MakeIcon(Color.DimGray);
-            _recordingIcon = MakeIcon(Color.Firebrick);
+            // Match the original Python QuickAudioRecorder icons:
+            // idle = solid #505050 circle; recording = #DC0000 circle with white center.
+            _idleIcon = MakeIcon(Color.FromArgb(80, 80, 80), false);
+            _recordingIcon = MakeIcon(Color.FromArgb(220, 0, 0), true);
             _tray = new NotifyIcon { Icon = _idleIcon, Visible = true, ContextMenuStrip = _menu };
             Diagnostics.Write("Tray initialization: NotifyIcon created and visible.");
             _hotkeys = new HotkeyService();
@@ -268,19 +270,19 @@ namespace QuickAudioRecorder
             ExitThread();
         }
 
-        private static Icon MakeIcon(Color color)
+        private static Icon MakeIcon(Color color, bool recording)
         {
             using (var bitmap = new Bitmap(32, 32))
             using (var g = Graphics.FromImage(bitmap))
-            using (var brush = new SolidBrush(color))
-            using (var pen = new Pen(color, 2.5f))
+            using (var outer = new SolidBrush(color))
+            using (var inner = new SolidBrush(Color.White))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
-                g.FillEllipse(brush, 11, 3, 10, 17);
-                g.DrawArc(pen, 6, 9, 20, 17, 0, 180);
-                g.DrawLine(pen, 16, 26, 16, 30);
-                g.DrawLine(pen, 10, 30, 22, 30);
+                // Original PyQt icon: 64px canvas, ellipse(4,4,56,56).
+                g.FillEllipse(outer, 2, 2, 28, 28);
+                // Original recording indicator: inner white ellipse(22,22,20,20).
+                if (recording) g.FillEllipse(inner, 11, 11, 10, 10);
                 IntPtr handle = bitmap.GetHicon();
                 try { return (Icon)Icon.FromHandle(handle).Clone(); }
                 finally { DestroyIcon(handle); }
