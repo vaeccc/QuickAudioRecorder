@@ -1,0 +1,69 @@
+name: MiniRec .NET Framework 4.8 preview
+
+on:
+  push:
+    branches:
+      - rewrite/dotnet48-tray
+    paths:
+      - "dotnet/**"
+      - ".github/workflows/rewrite-net48.yml"
+  workflow_dispatch:
+
+jobs:
+  build-preview:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore and build
+        shell: pwsh
+        run: |
+          msbuild dotnet/QuickAudioRecorder/QuickAudioRecorder.csproj /restore /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $output = "dotnet/QuickAudioRecorder/bin/x64/Release/net48"
+          if (!(Test-Path "$output/MiniRec.exe")) {
+            $output = "dotnet/QuickAudioRecorder/bin/Release/net48"
+          }
+          if (!(Test-Path "$output/MiniRec.exe")) { throw "Missing executable" }
+          New-Item -ItemType Directory -Force artifacts/MiniRec-preview | Out-Null
+          Get-ChildItem $output -File | Where-Object { $_.Extension -notin @(".pdb", ".xml") } |
+            Copy-Item -Destination artifacts/MiniRec-preview
+          Copy-Item dotnet/README.md artifacts/MiniRec-preview/README.md
+          Compress-Archive -Path artifacts/MiniRec-preview/* -DestinationPath artifacts/MiniRec-net48-preview-win-x64.zip -Force
+      - name: Startup smoke test from extracted ZIP
+        shell: pwsh
+        run: |
+          $zip = "artifacts/MiniRec-net48-preview-win-x64.zip"
+          $clean = Join-Path $env:RUNNER_TEMP "MiniRec-smoke"
+          Remove-Item $clean -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive $zip -DestinationPath $clean
+          $exe = Join-Path $clean "MiniRec.exe"
+          # Ensure original single-key + and - shortcuts still map to VK_ADD/VK_SUBTRACT.
+          $shortcutTest = Start-Process $exe -ArgumentList "--verify-hotkeys" -Wait -PassThru
+          if ($shortcutTest.ExitCode -ne 0) { throw "Legacy hotkey parsing regression" }
+          # Confirm forward slashes, Unicode, spaces and UNC paths resolve to the
+          # configured directory without passing the path as explorer.exe arguments.
+          $folderTest = Start-Process $exe -ArgumentList "--verify-folder-path" -Wait -PassThru
+          if ($folderTest.ExitCode -ne 0) { throw "Recording folder ShellExecute regression" }
+          $brandingTest = Start-Process $exe -ArgumentList "--verify-branding" -Wait -PassThru
+          if ($brandingTest.ExitCode -ne 0) { throw "MiniRec settings title/taskbar icon validation failed" }
+          $proc = Start-Process $exe -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited) { throw "MiniRec exited during startup with code $($proc.ExitCode)" }
+            $log = Join-Path $env:LOCALAPPDATA "QuickAudioRecorder\Logs\app.log"
+            if (!(Test-Path $log)) { throw "Startup log was not created: $log" }
+            if ((Get-Content $log -Raw) -notmatch "Tray initialization complete") { throw "Startup completion marker missing from log" }
+            $second = Start-Process $exe -PassThru
+            Start-Sleep -Seconds 2
+            if (!$second.HasExited) { throw "Second instance did not exit" }
+          } finally { if (!$proc.HasExited) { Stop-Process $proc -Force } }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MiniRec-net48-preview-win-x64
+          path: artifacts/MiniRec-net48-preview-win-x64.zip
+          if-no-files-found: error
