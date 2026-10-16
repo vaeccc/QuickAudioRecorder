@@ -56,8 +56,20 @@ namespace QuickAudioRecorder
             try
             {
                 if (File.Exists(FilePath))
+                {
+                    AppSettings settings;
                     using (var file = File.OpenRead(FilePath))
-                        return (AppSettings)Serializer.ReadObject(file);
+                        settings = (AppSettings)Serializer.ReadObject(file);
+                    if (settings != null)
+                    {
+                        var defaults = new AppSettings();
+                        if (string.IsNullOrWhiteSpace(settings.OutputFolder)) settings.OutputFolder = defaults.OutputFolder;
+                        if (string.IsNullOrWhiteSpace(settings.Format)) settings.Format = defaults.Format;
+                        if (string.IsNullOrWhiteSpace(settings.TrayClickMode)) settings.TrayClickMode = defaults.TrayClickMode;
+                        if (string.IsNullOrWhiteSpace(settings.Language)) settings.Language = defaults.Language;
+                        return settings;
+                    }
+                }
             }
             catch (Exception ex) { Diagnostics.Write("Settings load: " + ex.Message); }
             return new AppSettings();
