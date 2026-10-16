@@ -163,8 +163,7 @@ namespace QuickAudioRecorder
             _menu.Items.Add(new ToolStripSeparator());
             Add(T("打开录音文件夹", "Open recording folder"), () =>
             {
-                Directory.CreateDirectory(_settings.OutputFolder);
-                Process.Start("explorer.exe", "\"" + _settings.OutputFolder + "\"");
+                RecordingFolderLauncher.Open(_settings.OutputFolder);
                 return Task.CompletedTask;
             }, !_busy);
             Add(T("设置…", "Settings…"), () => { OpenSettings(); return Task.CompletedTask; }, !_busy);
