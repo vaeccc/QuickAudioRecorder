@@ -9,6 +9,13 @@ namespace QuickAudioRecorder
         [STAThread]
         private static void Main()
         {
+            // Lightweight regression test invoked by CI from the packaged executable.
+            if (Array.Exists(Environment.GetCommandLineArgs(), arg =>
+                string.Equals(arg, "--verify-hotkeys", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = HotkeyService.VerifyLegacyShortcuts() ? 0 : 1;
+                return;
+            }
             Diagnostics.Write("Process start. Version=" + typeof(Program).Assembly.GetName().Version);
             bool created;
             using (var instance = new Mutex(true, @"Local\QuickAudioRecorder-0D5AD7CA-3F13-4B23-8FA5-F9ED9B4E51D1", out created))
