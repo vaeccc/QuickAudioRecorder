@@ -1,4 +1,4 @@
-name: QuickAudioRecorder .NET Framework 4.8 preview
+name: MiniRec .NET Framework 4.8 preview
 
 on:
   push:
@@ -29,26 +29,26 @@ jobs:
             $output = "dotnet/QuickAudioRecorder/bin/Release/net48"
           }
           if (!(Test-Path "$output/QuickAudioRecorder.exe")) { throw "Missing executable" }
-          New-Item -ItemType Directory -Force artifacts/QuickAudioRecorder-preview | Out-Null
+          New-Item -ItemType Directory -Force artifacts/MiniRec-preview | Out-Null
           Get-ChildItem $output -File | Where-Object { $_.Extension -notin @(".pdb", ".xml") } |
-            Copy-Item -Destination artifacts/QuickAudioRecorder-preview
-          Copy-Item dotnet/README.md artifacts/QuickAudioRecorder-preview/README.md
-          Compress-Archive -Path artifacts/QuickAudioRecorder-preview/* -DestinationPath artifacts/QuickAudioRecorder-net48-preview-win-x64.zip -Force
+            Copy-Item -Destination artifacts/MiniRec-preview
+          Copy-Item dotnet/README.md artifacts/MiniRec-preview/README.md
+          Compress-Archive -Path artifacts/MiniRec-preview/* -DestinationPath artifacts/MiniRec-net48-preview-win-x64.zip -Force
       - name: Startup smoke test from extracted ZIP
         shell: pwsh
         run: |
-          $zip = "artifacts/QuickAudioRecorder-net48-preview-win-x64.zip"
-          $clean = Join-Path $env:RUNNER_TEMP "QuickAudioRecorder-smoke"
+          $zip = "artifacts/MiniRec-net48-preview-win-x64.zip"
+          $clean = Join-Path $env:RUNNER_TEMP "MiniRec-smoke"
           Remove-Item $clean -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive $zip -DestinationPath $clean
-          $exe = Join-Path $clean "QuickAudioRecorder.exe"
+          $exe = Join-Path $clean "MiniRec.exe"
           # Ensure original single-key + and - shortcuts still map to VK_ADD/VK_SUBTRACT.
           $shortcutTest = Start-Process $exe -ArgumentList "--verify-hotkeys" -Wait -PassThru
           if ($shortcutTest.ExitCode -ne 0) { throw "Legacy hotkey parsing regression" }
           $proc = Start-Process $exe -PassThru
           try {
             Start-Sleep -Seconds 5
-            if ($proc.HasExited) { throw "QuickAudioRecorder exited during startup with code $($proc.ExitCode)" }
+            if ($proc.HasExited) { throw "MiniRec exited during startup with code $($proc.ExitCode)" }
             $log = Join-Path $env:LOCALAPPDATA "QuickAudioRecorder\Logs\app.log"
             if (!(Test-Path $log)) { throw "Startup log was not created: $log" }
             if ((Get-Content $log -Raw) -notmatch "Tray initialization complete") { throw "Startup completion marker missing from log" }
@@ -58,6 +58,6 @@ jobs:
           } finally { if (!$proc.HasExited) { Stop-Process $proc -Force } }
       - uses: actions/upload-artifact@v4
         with:
-          name: QuickAudioRecorder-net48-preview-win-x64
-          path: artifacts/QuickAudioRecorder-net48-preview-win-x64.zip
+          name: MiniRec-net48-preview-win-x64
+          path: artifacts/MiniRec-net48-preview-win-x64.zip
           if-no-files-found: error
