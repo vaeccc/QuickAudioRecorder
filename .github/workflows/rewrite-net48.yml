@@ -45,6 +45,8 @@ jobs:
           # Ensure original single-key + and - shortcuts still map to VK_ADD/VK_SUBTRACT.
           $shortcutTest = Start-Process $exe -ArgumentList "--verify-hotkeys" -Wait -PassThru
           if ($shortcutTest.ExitCode -ne 0) { throw "Legacy hotkey parsing regression" }
+          $brandingTest = Start-Process $exe -ArgumentList "--verify-branding" -Wait -PassThru
+          if ($brandingTest.ExitCode -ne 0) { throw "MiniRec settings title/taskbar icon validation failed" }
           $proc = Start-Process $exe -PassThru
           try {
             Start-Sleep -Seconds 5
