@@ -131,8 +131,17 @@ namespace QuickAudioRecorder
                     "QuickAudioRecorder", "Logs");
                 Directory.CreateDirectory(dir);
                 lock (Sync)
-                    File.AppendAllText(Path.Combine(dir, "app.log"),
-                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") + message + Environment.NewLine, Encoding.UTF8);
+                {
+                    string path = Path.Combine(dir, "app.log");
+                    if (File.Exists(path) && new FileInfo(path).Length > 512 * 1024)
+                    {
+                        string previous = Path.Combine(dir, "app.previous.log");
+                        SettingsStore.TryDelete(previous);
+                        File.Move(path, previous);
+                    }
+                    File.AppendAllText(path, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss ") +
+                        message + Environment.NewLine, Encoding.UTF8);
+                }
             }
             catch { }
         }
