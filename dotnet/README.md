@@ -8,7 +8,7 @@
 - 不显示主窗口，启动后直接常驻系统托盘
 - 左键点击托盘：使用上次录音模式快速开始或停止
 - 右键：录制麦克风、电脑声音、混合录音、打开文件夹、设置、退出
-- 系统原生快捷键 `RegisterHotKey`；冲突时拒绝保存有问题的绑定
+- 系统原生快捷键 `RegisterHotKey`；兼容旧版配置里的数字小键盘 `+`、`-` 单键（分别对应 `VK_ADD`、`VK_SUBTRACT`），也支持 Ctrl/Alt/Shift 组合；冲突时拒绝保存有问题的绑定
 - 通过 NAudio WASAPI 捕获麦克风与系统播放音频
 - WAV / MP3；可选音量标准化；可选复制文件到剪贴板
 - 不额外安装 .NET 10 Desktop Runtime；使用 Windows 自带的 .NET Framework 4.8/4.8.1
