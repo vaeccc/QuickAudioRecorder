@@ -116,7 +116,7 @@ namespace QuickAudioRecorder
                 hotkeys.Controls.Add(new Label { Text = labels[i], AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 5, 0, 5) }, 0, i);
                 hotkeys.Controls.Add(_hotkeys[i], 1, i);
             }
-            var hint = new Label { Text = T("点击后按组合键；Esc 保留原值，Delete 清除。留空表示禁用。", "Click and press a combination; Esc keeps the old value, Delete clears it. Blank disables it."), AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(0, 8, 0, 0) };
+            var hint = new Label { Text = T("可直接按数字小键盘 + / - 或组合键；Esc 取消，Delete 清除。", "Use numpad + / - or a combination; Esc cancels, Delete clears."), AutoSize = true, ForeColor = SystemColors.GrayText, Margin = new Padding(0, 8, 0, 0) };
             hotkeys.Controls.Add(hint, 0, 4); hotkeys.SetColumnSpan(hint, 2); hotkeyGroup.Controls.Add(hotkeys);
             var generalGroup = new GroupBox { Text = T("常规", "General"), Dock = DockStyle.Fill, Padding = new Padding(12, 20, 12, 10), AutoSize = true };
             var general = Table(2); general.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); general.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
@@ -240,8 +240,29 @@ namespace QuickAudioRecorder
                     System.Media.SystemSounds.Beep.Play();
                     return;
                 }
-                Keys modifiers = e.Modifiers & Keys.Modifiers; bool validKey = (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z) || (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) || (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) || (e.KeyCode >= Keys.F1 && e.KeyCode <= Keys.F12);
-                if (modifiers == Keys.None || !validKey) { System.Media.SystemSounds.Beep.Play(); return; }
+                Keys modifiers = e.Modifiers & Keys.Modifiers;
+                // Preserve Python version's single-key numeric keypad + and -.
+                if (e.KeyCode == Keys.Add || e.KeyCode == Keys.Subtract)
+                {
+                    if (modifiers == Keys.None)
+                        Text = e.KeyCode == Keys.Add ? "+" : "-";
+                    else
+                    {
+                        var tokens = new List<string>();
+                        if ((modifiers & Keys.Control) != 0) tokens.Add("Ctrl");
+                        if ((modifiers & Keys.Alt) != 0) tokens.Add("Alt");
+                        if ((modifiers & Keys.Shift) != 0) tokens.Add("Shift");
+                        tokens.Add(e.KeyCode == Keys.Add ? "NumPadAdd" : "NumPadSubtract");
+                        Text = string.Join("+", tokens);
+                    }
+                    return;
+                }
+                bool validKey = (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z) ||
+                    (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) ||
+                    (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) ||
+                    (e.KeyCode >= Keys.F1 && e.KeyCode <= Keys.F12);
+                // Legacy shortcuts also permit single ordinary keys.
+                if (!validKey) { System.Media.SystemSounds.Beep.Play(); return; }
                 var parts = new List<string>();
                 if ((modifiers & Keys.Control) != 0) parts.Add("Ctrl");
                 if ((modifiers & Keys.Alt) != 0) parts.Add("Alt");
