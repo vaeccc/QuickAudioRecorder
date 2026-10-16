@@ -157,8 +157,16 @@ namespace QuickAudioRecorder
 
         private async Task RefreshDevicesAsync()
         {
-            if (_loading || _closing) return; _loading = true; _refresh.Enabled = false; _deviceStatus.Text = T("正在检查设备…", "Checking devices…");
-            if (_deviceScan != null && !_deviceScan.IsCompleted) return;
+            if (_loading || _closing) return;
+            if (_deviceScan != null && !_deviceScan.IsCompleted)
+            {
+                _deviceStatus.Text = T("设备仍在检查中，请稍后重试", "Device scan is still running");
+                _refresh.Enabled = false;
+                return;
+            }
+            _loading = true;
+            _refresh.Enabled = false;
+            _deviceStatus.Text = T("正在检查设备…", "Checking devices…");
             string remembered = (_mic.SelectedItem as Device)?.Id ?? _original.DeviceId ?? ""; var previous = _mic.SelectedItem as Device;
             _refreshCancellation?.Cancel(); _refreshCancellation?.Dispose(); _refreshCancellation = new CancellationTokenSource();
             try
@@ -180,7 +188,23 @@ namespace QuickAudioRecorder
                 _loading = false;
                 if (!_closing && !IsDisposed) _refresh.Enabled = _deviceScan == null || _deviceScan.IsCompleted;
                 if (_deviceScan != null && !_deviceScan.IsCompleted)
-                    _deviceScan.ContinueWith(_ => { if (!_closing && !IsDisposed) BeginInvoke((Action)(() => _refresh.Enabled = true)); }, TaskScheduler.Default);
+                    _deviceScan.ContinueWith(task =>
+                    {
+                        // The COM enumeration may outlive a timeout or the window itself.
+                        // Never touch WinForms controls from the worker thread.
+                        try
+                        {
+                            if (task.IsFaulted) Diagnostics.Write("Late device scan: " + task.Exception);
+                            if (_closing || IsDisposed || !IsHandleCreated) return;
+                            BeginInvoke((Action)(() =>
+                            {
+                                if (!_closing && !IsDisposed && _deviceScan == task)
+                                    _refresh.Enabled = true;
+                            }));
+                        }
+                        catch (InvalidOperationException) { }
+                        catch (ObjectDisposedException) { }
+                    }, TaskScheduler.Default);
             }
         }
         private List<Device> EnumerateDevices()
@@ -198,6 +222,8 @@ namespace QuickAudioRecorder
         private sealed class Device { public string Id; public string Name; public override string ToString() => Name; }
         private sealed class KeyGestureTextBox : TextBox
         {
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            private static extern short GetAsyncKeyState(int virtualKey);
             private string _beforeCapture;
             public KeyGestureTextBox() { ReadOnly = true; ShortcutsEnabled = false; }
             protected override void OnEnter(EventArgs e) { _beforeCapture = Text; base.OnEnter(e); }
@@ -206,10 +232,31 @@ namespace QuickAudioRecorder
                 e.Handled = true; e.SuppressKeyPress = true;
                 if (e.KeyCode == Keys.Escape) { Text = _beforeCapture ?? Text; Parent?.Focus(); return; }
                 if (e.KeyCode == Keys.Delete || e.KeyCode == Keys.Back) { Text = ""; return; }
-                if (e.KeyCode == Keys.LWin || e.KeyCode == Keys.RWin || e.Modifiers.HasFlag(Keys.LWin) || e.Modifiers.HasFlag(Keys.RWin)) { System.Media.SystemSounds.Beep.Play(); return; }
+                // Win is not part of Keys.Modifiers. Check its physical state explicitly.
+                if (e.KeyCode == Keys.LWin || e.KeyCode == Keys.RWin ||
+                    (GetAsyncKeyState(0x5B) & 0x8000) != 0 ||
+                    (GetAsyncKeyState(0x5C) & 0x8000) != 0)
+                {
+                    System.Media.SystemSounds.Beep.Play();
+                    return;
+                }
                 Keys modifiers = e.Modifiers & Keys.Modifiers; bool validKey = (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z) || (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) || (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) || (e.KeyCode >= Keys.F1 && e.KeyCode <= Keys.F12);
                 if (modifiers == Keys.None || !validKey) { System.Media.SystemSounds.Beep.Play(); return; }
-                var parts = new List<string>(); if ((modifiers & Keys.Control) != 0) parts.Add("Ctrl"); if ((modifiers & Keys.Alt) != 0) parts.Add("Alt"); if ((modifiers & Keys.Shift) != 0) parts.Add("Shift"); string key = e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9 ? ((int)e.KeyCode - (int)Keys.NumPad0).ToString() : e.KeyCode.ToString().Replace("D", ""); parts.Add(key); Text = string.Join("+", parts);
+                var parts = new List<string>();
+                if ((modifiers & Keys.Control) != 0) parts.Add("Ctrl");
+                if ((modifiers & Keys.Alt) != 0) parts.Add("Alt");
+                if ((modifiers & Keys.Shift) != 0) parts.Add("Shift");
+                string key;
+                if (e.KeyCode >= Keys.A && e.KeyCode <= Keys.Z)
+                    key = ((char)(int)e.KeyCode).ToString();
+                else if (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9)
+                    key = ((int)e.KeyCode - (int)Keys.D0).ToString();
+                else if (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9)
+                    key = ((int)e.KeyCode - (int)Keys.NumPad0).ToString();
+                else
+                    key = e.KeyCode.ToString();
+                parts.Add(key);
+                Text = string.Join("+", parts);
             }
         }
     }
